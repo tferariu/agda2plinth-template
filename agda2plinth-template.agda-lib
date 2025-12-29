@@ -1,0 +1,4 @@
+name: agda2plinth-template
+include: . 
+depend: agda2hs-base, standard-library
+flags: --erasure
