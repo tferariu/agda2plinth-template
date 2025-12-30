@@ -624,6 +624,12 @@ liquidity par s@record { datum = (tok , Collecting v' pkh' d' sigs') ; value = v
 
 -- Extracting the State from ScriptContext
 
+sig : ScriptContext -> PubKeyHash
+sig = ScriptContext.signature
+
+iRef : ScriptContext -> TxOutRef
+iRef = ScriptContext.inputRef
+
 -- Starting State for normal transitions
 getS : Label -> ScriptContext -> State
 getS (tok , lab) ctx = record

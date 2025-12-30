@@ -177,6 +177,12 @@ liquidity par s (p1 , p2 , p3) = ⟨ s' , ⟨  Close ∷ [] , (fin (TClose refl 
 
 -- Extracting the State from ScriptContext
 
+sig : ScriptContext -> PubKeyHash
+sig = ScriptContext.signature
+
+iRef : ScriptContext -> TxOutRef
+iRef = ScriptContext.inputRef
+
 -- Starting State for normal transitions
 getS : Label -> ScriptContext -> State
 getS (tok , lab) ctx = record

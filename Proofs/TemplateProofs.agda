@@ -125,6 +125,13 @@ liquidity : ∀ (par : MParams) (s : State)
 liquidity = {!!}
 
 -- Extracting the model state from the ScriptContext for the various transitions
+
+sig : ScriptContext -> PubKeyHash
+sig = ScriptContext.signature
+
+iRef : ScriptContext -> TxOutRef
+iRef = ScriptContext.inputRef
+
 getS : Label -> ScriptContext -> State
 getS (tok , lab) ctx = {!!}
 

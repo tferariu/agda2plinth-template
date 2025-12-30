@@ -559,6 +559,12 @@ liquidity s@record { datum = (tok , map) ; value = value ; tsig = tsig ; continu
 
 -- Extracting the State from ScriptContext
 
+sig : ScriptContext -> PubKeyHash
+sig = ScriptContext.signature
+
+iRef : ScriptContext -> TxOutRef
+iRef = ScriptContext.inputRef
+
 -- Starting State for normal transitions
 getS : Label -> ScriptContext -> State
 getS (tok , map) ctx = record
@@ -578,9 +584,9 @@ getMintS : TokenName -> ScriptContext -> State
 getMintS tn ctx = record
                 { datum = newDatum ctx
                 ; value = newValue ctx
-                ; tsig = sig ctx
+                ; tsig = ScriptContext.signature ctx
                 ; continues = continuing ctx
-                ; spends = iRef ctx
+                ; spends = ScriptContext.inputRef ctx
                 ; hasToken = checkTokenOut (ownAssetClass tn ctx) ctx
                 ; mint = getMintedAmount ctx
                 ; token = ownAssetClass tn ctx

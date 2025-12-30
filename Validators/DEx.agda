@@ -79,12 +79,6 @@ checkTokenOut ac = ScriptContext.tokenOut
 checkSigned : PubKeyHash -> ScriptContext -> Bool
 checkSigned sig ctx = sig == ScriptContext.signature ctx
 
-sig : ScriptContext -> PubKeyHash
-sig = ScriptContext.signature
-
-iRef : ScriptContext -> TxOutRef
-iRef = ScriptContext.inputRef
-
 checkTokenBurned : AssetClass -> ScriptContext -> Bool
 checkTokenBurned tok ctx = ScriptContext.mint ctx == -1
 
