@@ -1,5 +1,6 @@
 open import Lib
 open import Haskell.Prelude
+open import Relation.Binary.PropositionalEquality.Core
 
 module Value where
 
@@ -97,6 +98,41 @@ assetClassValue ac amt = MkMap ((ac , amt) ∷ [])
 checkMinValue : Value -> Bool
 checkMinValue v = (assetClassValueOf v ada) >= 5
 
+sumLemma' : ∀ (a b : Value)
+           -> geq a emptyValue ≡ True
+           -> geq b emptyValue ≡ True
+           -> geq (addValue a b) emptyValue ≡ True
+sumLemma' (MkMap []) (MkMap []) = λ z z₁ → z
+sumLemma' (MkMap []) (MkMap (x ∷ y)) = λ z z₁ → z
+sumLemma' (MkMap (x ∷ x₁)) (MkMap []) = λ z z₁ → z
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 with x .fst == y .fst in eq1
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | True = p1
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False with x .fst .fst < y .fst .fst in eq2
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False | True = p1
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False | False with x .fst .fst == y .fst .fst in eq3
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False | False | True with x .fst .snd < y .fst .snd in eq4
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False | False | True | True = p1
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False | False | True | False with x .fst .snd == y .fst .snd in eq5
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False | False | True | False | True = p1
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False | False | True | False | False = p1
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False | False | False  = p1
+
+diffLemma' : ∀ (a b : Value)
+            -> geq a b ≡ True
+            -> geq (subValue a b) emptyValue ≡ True
+diffLemma' (MkMap []) (MkMap []) = λ z → z
+diffLemma' (MkMap []) (MkMap (x ∷ y)) = λ ()
+diffLemma' (MkMap (x ∷ x₁)) (MkMap []) = λ z → z
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) with x .fst .fst < y .fst .fst in eq1
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | True = λ ()
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False with x .fst .fst == y .fst .fst in eq2
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False | True with x .fst .snd < y .fst .snd in eq3
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False | True | True = λ ()
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False | True | False with x .fst .snd == y .fst .snd in eq4
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False | True | False | True = λ z → refl
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False | True | False | False = λ z → z
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False | False = λ z → z
+
 --Postulated properties of Value. 
 
 postulate
@@ -105,17 +141,31 @@ postulate
   v=v : ∀ (v : Value) -> (v == v) ≡ True
   ==vto≡ : ∀ (a b : Value) -> (a == b) ≡ True -> a ≡ b
   ≡vto== : ∀ (a b : Value) -> a ≡ b -> (a == b) ≡ True
+  
   addValIdL : ∀ (a : Value) -> emptyValue + a ≡ a
+
   addValIdR : ∀ (a : Value) -> a + emptyValue ≡ a
+  
   switchSides : ∀ (a b c : Value) -> a + b ≡ c -> a ≡ c - b
-  switchSides' :  ∀ (a b c : Value) -> a - b ≡ c -> a ≡ b + c
+  doubleNeg : ∀ (a : Value) -> a ≡ negValue (negValue a)
+
   v-v : ∀ (a : Value) -> subValue a a ≡ emptyValue
-  geq-refl : ∀ (a : Value) -> geq a a ≡ True 
+
+  geq-refl : ∀ (a : Value) -> geq a a ≡ True
+  
   notGeqToLt : ∀ (a b : Value) -> geq a b ≡ False -> lt a b ≡ True
   ltToGt : ∀ (a b : Value) -> lt a b ≡ True -> gt b a ≡ True
   geqTrans : ∀ (a b c : Value) -> geq a b ≡ True -> geq b c ≡ True -> geq a c ≡ True
-  sumLemma : ∀ (a b : Value) -> geq a emptyValue ≡ True -> geq b emptyValue ≡ True -> geq (addValue a b) emptyValue ≡ True
-  diffLemma : ∀ (a b : Value) -> geq a b ≡ True -> geq b emptyValue ≡ True -> geq (subValue a b) emptyValue ≡ True
+  
+  sumLemma : ∀ (a b : Value)
+           -> geq a emptyValue ≡ True
+           -> geq b emptyValue ≡ True
+           -> geq (addValue a b) emptyValue ≡ True
+
+  diffLemma : ∀ (a b : Value)
+            -> geq a b ≡ True
+            -> geq (subValue a b) emptyValue ≡ True
+            
   lovelaceLemma : ∀ (a b : Value) -> geq a b ≡ True -> (lovelaces a >= lovelaces b) ≡ True
 
   

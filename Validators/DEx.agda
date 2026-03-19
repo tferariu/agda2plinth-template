@@ -130,7 +130,7 @@ open Params public
 
 -- Helper functions of the validator
 checkRational : Rational -> Bool
-checkRational r = (numerator r >= 0) && (denominator r > 0)
+checkRational r = (numerator r > 0) && (denominator r > 0)
 
 ratioCompare : Integer -> Integer -> Rational -> Bool
 ratioCompare a b r = a * (numerator r) <= b * (denominator r)

@@ -2,7 +2,7 @@ open import Haskell.Prelude hiding (lookup)
 open import Lib
 open import Value
 
-module Validators.AccountSim where
+module Validators.AccountSim3 where
 
 -- Defining the types of our Plinth Datum, referred to as Label in Agda
 AccMap = List (PubKeyHash × Value)
@@ -63,13 +63,13 @@ checkTokenOut : AssetClass -> ScriptContext -> Bool
 checkTokenOut ac = ScriptContext.tokenOut
         
 checkSigned : PubKeyHash -> ScriptContext -> Bool
-checkSigned sig ctx = sig == ScriptContext.signature ctx
+checkSigned sig ctx = ScriptContext.signature ctx == sig
 
 checkTokenBurned : AssetClass -> ScriptContext -> Bool
 checkTokenBurned tok ctx = ScriptContext.mint ctx == -1
 
 consumes : TxOutRef -> ScriptContext -> Bool
-consumes oref ctx = oref == ScriptContext.inputRef ctx
+consumes oref ctx = ScriptContext.inputRef ctx == oref
 
 continuingAddr : Address -> ScriptContext -> Bool
 continuingAddr addr ctx = ScriptContext.continues ctx
