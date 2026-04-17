@@ -2,22 +2,22 @@ open import Haskell.Prelude hiding (lookup)
 open import Lib
 open import Value
 
-module Validators.AccountSim3 where
+module Validators.AccountSim4 where
 
 -- Defining the types of our Plinth Datum, referred to as Label in Agda
 AccMap = List (PubKeyHash × Value)
 
-Datum' = (AssetClass × AccMap)
+Datum = (AssetClass × AccMap)
 
 {-# COMPILE AGDA2HS AccMap #-}
-{-# COMPILE AGDA2HS Datum' #-}
+{-# COMPILE AGDA2HS Datum #-}
 
 -- The abstract ScriptContext
 record ScriptContext : Set where
     field     
         inputVal      : Value
         outputVal     : Value
-        outputDatum   : Datum'
+        outputDatum   : Datum
         payments      : List (PubKeyHash × Value)
         signature     : PubKeyHash
         continues     : Bool
@@ -31,7 +31,7 @@ record ScriptContext : Set where
 -- Functions equivalent to Plinth ScriptContext functions or provided by our template
 --https://plutus.cardano.intersectmbo.org/haddock/latest/plutus-ledger-api/PlutusLedgerApi-V3-Data-Contexts.html#t:ScriptContext
 
-newDatum : ScriptContext -> Datum'
+newDatum : ScriptContext -> Datum
 newDatum ctx = ScriptContext.outputDatum ctx
 
 oldValue : ScriptContext -> Value
@@ -74,7 +74,7 @@ consumes oref ctx = ScriptContext.inputRef ctx == oref
 continuingAddr : Address -> ScriptContext -> Bool
 continuingAddr addr ctx = ScriptContext.continues ctx
 
-newDatumAddr : Address -> ScriptContext -> Datum'
+newDatumAddr : Address -> ScriptContext -> Datum
 newDatumAddr adr ctx = newDatum ctx
 
 newValueAddr : Address -> ScriptContext -> Value
@@ -96,15 +96,15 @@ validRange : ScriptContext -> Interval
 validRange ctx = ScriptContext.validInterval ctx
 
 -- The type of the Plinth Redeemer, referred to as Input in Agda
-data Redeemer' : Set where
-  Open     : PubKeyHash -> Redeemer'
-  Close    : PubKeyHash -> Redeemer'
-  Withdraw : PubKeyHash -> Value -> Redeemer'
-  Deposit  : PubKeyHash -> Value -> Redeemer'
-  Transfer : PubKeyHash -> PubKeyHash -> Value -> Redeemer'
-  Cleanup  : Redeemer'
+data Redeemer : Set where
+  Open     : PubKeyHash -> Redeemer
+  Close    : PubKeyHash -> Redeemer
+  Withdraw : PubKeyHash -> Value -> Redeemer
+  Deposit  : PubKeyHash -> Value -> Redeemer
+  Transfer : PubKeyHash -> PubKeyHash -> Value -> Redeemer
+  Cleanup  : Redeemer
 
-{-# COMPILE AGDA2HS Redeemer' #-}
+{-# COMPILE AGDA2HS Redeemer #-}
 
 -- Helper functions of the validator
 
@@ -159,7 +159,7 @@ checkTransfer tok (Just vF) (Just vT) from to val map ctx = geq val emptyValue &
 {-# COMPILE AGDA2HS checkTransfer #-}
 
 -- The Validator
-agdaValidator : Datum' -> Redeemer' -> ScriptContext -> Bool
+agdaValidator : Datum -> Redeemer -> ScriptContext -> Bool
 agdaValidator (tok , map) inp ctx = checkTokenIn tok ctx && (case inp of λ where
 
     (Open pkh) -> checkTokenOut tok ctx && continuing ctx && checkSigned pkh ctx &&
@@ -181,7 +181,7 @@ agdaValidator (tok , map) inp ctx = checkTokenIn tok ctx && (case inp of λ wher
                               checkTransfer tok (lookup from map) (lookup to map) from to val map ctx &&
                               newValue ctx == oldValue ctx 
 
-    Cleanup -> checkTokenBurned tok ctx && not (checkTokenOut tok ctx) && not (continuing ctx) && map == [] )
+    Cleanup -> checkTokenBurned tok ctx && not (continuing ctx) && map == [] )
 
 {-# COMPILE AGDA2HS agdaValidator #-}
 

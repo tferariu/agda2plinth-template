@@ -1,4 +1,4 @@
-open import Validators.AccountSim3
+open import Validators.AccountSim4
 open import Lib
 open import Value
 
@@ -29,7 +29,7 @@ open import Function.Base using (_∋_)
 open _×_×_
 open import ProofLib
 
-module Proofs.AccountSimProofs3 where
+module Proofs.AccountSimProofs5 where
 
 -- Model and proofs for the Account Simulation contract
   
@@ -37,11 +37,11 @@ module Proofs.AccountSimProofs3 where
 
 record State : Set where
   field
-    datum      : Datum'
+    datum      : Datum
     value      : Value  
     tsig       : PubKeyHash
     spends     : TxOutRef
-    mint       : Integer
+    --mint       : Integer
     token      : AssetClass
 open State
 
@@ -75,7 +75,7 @@ data _⊢_ : MParams -> State -> Set where
 
   TStart : ∀ {par s tok}
     -> datum s ≡ ( tok , [] )
-    -> mint s ≡ 1
+    -- -> mint s ≡ 1
     -> spends s ≡ uniqueId par 
     -> token s ≡ tok
     -> token s .snd ≡ threadTokName par
@@ -85,7 +85,7 @@ data _⊢_ : MParams -> State -> Set where
 
 -- The Running Transition
 
-data _⊢_~[_]~>_ : MParams -> State -> Redeemer' -> State -> Set where
+data _⊢_~[_]~>_ : MParams -> State -> Redeemer -> State -> Set where
  
   TOpen : ∀ {par pkh s s' tok map}
     -> datum s ≡ (tok , map)
@@ -142,18 +142,18 @@ data _⊢_~[_]~>_ : MParams -> State -> Redeemer' -> State -> Set where
 
 -- The Final Transition
 
-data _⊢_~[_]~|_ : MParams -> State -> Redeemer' -> State -> Set where
+data _⊢_~[_]~> : MParams -> State -> Redeemer -> Set where
 
-  TCleanup : ∀ {par s s'}
+  TCleanup : ∀ {par s}
     -> snd (datum s) ≡ []
-    -> mint s' ≡ -1
+    -- -> mint s' ≡ -1
     -------------------
-    -> par ⊢ s ~[ Cleanup ]~| s'
+    -> par ⊢ s ~[ Cleanup ]~>
 
 
 --Multi-Step Transition
 
-data _⊢_~[_]~*_ : MParams -> State -> List Redeemer' -> State -> Set where
+data _⊢_~[_]~*_ : MParams -> State -> List Redeemer -> State -> Set where
 
   root : ∀ { par s }
     ------------------
@@ -166,13 +166,13 @@ data _⊢_~[_]~*_ : MParams -> State -> List Redeemer' -> State -> Set where
     -> par ⊢ s ~[ (i ∷ is) ]~* s''
 
 
-data _⊢_~[_]~*|_ : MParams -> State -> List Redeemer' -> State -> Set where
+data _⊢_~[_]~>* : MParams -> State -> List Redeemer -> Set where
 
-  fin : ∀ { par s s' s'' is i }
+  fin : ∀ { par s s' is i }
     -> par ⊢ s ~[ is ]~* s'
-    -> par ⊢ s' ~[ i ]~| s''
+    -> par ⊢ s' ~[ i ]~>
     -------------------------
-    -> par ⊢ s ~[ (is ++ [ i ]) ]~*| s''
+    -> par ⊢ s ~[ (is ++ [ i ]) ]~>*
 
 
 -- Validity predicate
@@ -217,7 +217,7 @@ initialValidity : ∀ {s par}
   -> par ⊢ s
   -> Valid s 
 initialValidity {record { datum = .(_ , [])}}
-                (TStart refl p3 p4 p5 p6 p7) = allNil
+                (TStart refl p3 p4 p5 p6 ) = allNil
 
 validity : ∀ {s s' i par}
   -> Valid s
@@ -335,7 +335,7 @@ initialFidelity : ∀ {s par}
   -> par ⊢ s
   -> Fides s
 initialFidelity {record { datum = .(_ , []) }}
-                (TStart refl x₁ x₂ x₃ x₄ x₅) = x₅
+                (TStart refl x₂ x₃ x₄ x₅) = x₅
 
 fidelity : ∀ {s s' i par}
          -> Fides s
@@ -385,7 +385,7 @@ stateInvariant (valid , fides) p = validity valid p , fidelity fides p
 
 -- Lemmas for Liquidity
 
-makeIs : AccMap -> List Redeemer'
+makeIs : AccMap -> List Redeemer
 makeIs [] = []
 makeIs ((pkh , v) ∷ map) = (Withdraw pkh v) ∷ (Close pkh) ∷ (makeIs map)
 
@@ -445,24 +445,24 @@ prop1 : ∀ {tok} {map : AccMap} (s s' : State) {par}
         -> tsig s' ≡ lastSig map (tsig s)
         -> value s ≡ sumVal map
         -> spends s ≡ spends s'
-        -> mint s ≡ mint s'
+        -- -> mint s ≡ mint s'
         -> token s ≡ token s'
         -> Valid s
         -> par ⊢ s ~[ (makeIs map) ]~* s'
         
 prop1 record { datum = (tok , []) } record { datum = (tok' , map') }
-  refl refl refl refl refl refl refl refl p = root
+  refl refl refl refl refl refl refl p = root
 prop1 s@record { datum = (tok , (pkh , v) ∷ map')
-               ; spends = spends ; mint = mint ; token = token }
+               ; spends = spends ; token = token }
       s'@record { datum = (tok , map'') } refl  refl refl
-      refl refl refl refl refl p
+      refl refl refl refl p
       = cons {s' = st} (TWithdraw refl refl (rwLookup (n=n pkh))
         (subGeq map' p) (geq-refl v) (rwInsertDelete (n=n pkh)
         (rwAccMap pkh v map')) (rwVal (value st) v)) 
         (cons {s' = st'} (TClose refl refl (rwLookup (n=n pkh))
         (rwInsertDelete (n=n pkh) refl) refl )
         (prop1 st' s' refl refl refl (sameLastSig map')
-        refl refl refl refl (subValid map' p)))
+        refl refl refl (subValid map' p)))
         
       where
       st = record
@@ -471,7 +471,6 @@ prop1 s@record { datum = (tok , (pkh , v) ∷ map')
             ; value = sumVal map'
             ; tsig = pkh
             ; spends = spends
-            ; mint = mint
             ; token = token }
             
       st' = record
@@ -479,7 +478,6 @@ prop1 s@record { datum = (tok , (pkh , v) ∷ map')
              ; value = sumVal map'
              ; tsig = pkh
              ; spends = spends
-             ; mint = mint
              ; token = token }
 
 --Liquidity (For any state that is valid and has valid parameters,
@@ -488,15 +486,32 @@ prop1 s@record { datum = (tok , (pkh , v) ∷ map')
 
 liquidity : ∀ (s : State) (par : MParams)
           -> Invariant s
-          -> ∃[ s' ] ∃[ is ]
-             ((par ⊢ s ~[ is ]~*| s')
-             × (value s' ≡ emptyValue))
+          -> ∃[ is ] par ⊢ s ~[ is ]~>*
+
 
 liquidity s@record { datum = (tok , map) ; spends = spends
-  ; mint = mint ; token = token } par (p1 , p2) 
-  = ⟨ s'' , ⟨ (makeIs map ++ [ Cleanup ]) ,
-    ((fin (prop1 s s' refl refl refl refl p2 refl refl refl p1)
-    (TCleanup refl refl)) , refl) ⟩ ⟩
+  ; token = token } par (p1 , p2) 
+  = ⟨ (makeIs map ++ [ Cleanup ]) ,
+    (fin (prop1 s s' refl refl refl refl p2 refl refl p1)
+    (TCleanup refl) ) ⟩ 
+  where
+  s' = record
+       { datum = tok , []
+       ; value = minValue
+       ; tsig = lastSig map (tsig s)
+       ; spends = spends
+       ; token = token }
+       
+minValLiquidity : ∀ (s : State) (par : MParams)
+          -> Invariant s
+          -> ∃[ s' ] ∃[ is ]
+             ((par ⊢ s ~[ is ]~* s')
+             × (value s' ≡ minValue))
+
+minValLiquidity s@record { datum = (tok , map) ; spends = spends
+  ; token = token } par (p1 , p2) 
+  = ⟨ s' , ⟨ (makeIs map) ,
+    ((prop1 s s' refl refl refl refl p2 refl refl p1) , refl) ⟩ ⟩
     
   where
   s' = record
@@ -504,19 +519,11 @@ liquidity s@record { datum = (tok , map) ; spends = spends
        ; value = minValue
        ; tsig = lastSig map (tsig s)
        ; spends = spends
-       ; mint = mint
        ; token = token }
        
-  s'' = record
-       { datum = (0 , 0) , []
-       ; value = emptyValue
-       ; tsig = 0 
-       ; spends = 0
-       ; mint = negsuc 0
-       ; token = 0 , 0 }
-
+       
 -- Multi-Step transition lemma
-lemmaMultiStep : ∀ (s s' s'' : State) (is is' : List Redeemer') {par}
+lemmaMultiStep : ∀ (s s' s'' : State) (is is' : List Redeemer) {par}
                    -> par ⊢  s  ~[ is  ]~* s'
                    -> par ⊢ s' ~[ is' ]~* s''
                    -> par ⊢ s  ~[ is ++ is' ]~* s''
@@ -524,14 +531,13 @@ lemmaMultiStep s .s s'' [] is' root p2 = p2
 lemmaMultiStep s s' s'' (x ∷ is) is' (cons {s' = s'''} p1 p2) p3 = cons p1 (lemmaMultiStep s''' s' s'' is is' p2 p3)
 
 
-originStateRewrite : ∀ {sig spn m tok} (par : MParams) (s s' : State) (i : Redeemer')
+originStateRewrite : ∀ {sig spn tok} (par : MParams) (s s' : State) (i : Redeemer)
                  -> par ⊢ s ~[ i ]~> s'
                  -> par ⊢ record
                            { datum = datum s
                            ; value = value s
                            ; tsig = sig
                            ; spends = spn
-                           ; mint = m
                            ; token = tok
                            } ~[ i ]~> s'
                            
@@ -546,14 +552,13 @@ originStateRewrite par s s' i (TWithdraw x x₁ x₂ x₃ x₄ x₅ x₆)
 originStateRewrite par s s' i (TTransfer x x₁ x₂ x₃ x₄ x₅ x₆ x₇ x₈)
   = TTransfer x x₁ x₂ x₃ x₄ x₅ x₆ x₇ x₈
 
-targetStateRewrite : ∀ {spn m tok} (par : MParams) (s s' : State) (i : Redeemer')
+targetStateRewrite : ∀ {spn tok} (par : MParams) (s s' : State) (i : Redeemer)
                  -> par ⊢ s ~[ i ]~> s'
                  -> par ⊢ s ~[ i ]~> record
                                       { datum = datum s'
                                       ; value = value s'
                                       ; tsig = tsig s'
                                       ; spends = spn
-                                      ; mint = m
                                       ; token = tok
                                       }
 
@@ -600,7 +605,6 @@ userCanRecoverFunds {val} s@record { datum = (tok , map) ; value = v}
         ; value = subValue v val
         ; tsig = pkh
         ; spends = 0
-        ; mint = 0
         ; token = 0 , 0
         }
 
@@ -653,13 +657,12 @@ iRef : ScriptContext -> TxOutRef
 iRef = ScriptContext.inputRef
 
 -- Initialing State for normal transitions
-getS : Datum' -> ScriptContext -> State
+getS : Datum -> ScriptContext -> State
 getS (tok , map) ctx = record
                                { datum = (tok , map)
                                ; value = oldValue ctx
                                ; tsig = 0 
                                ; spends = 0
-                               ; mint = 0
                                ; token = 0 , 0
                                }
 
@@ -672,7 +675,7 @@ getMintS tn ctx = record
                 ; value = newValue ctx
                 ; tsig = ScriptContext.signature ctx
                 ; spends = ScriptContext.inputRef ctx
-                ; mint = getMintedAmount ctx
+              --  ; mint = getMintedAmount ctx
                 ; token = ownAssetClass tn ctx
                 }
 
@@ -683,7 +686,7 @@ getS' ctx = record
                                ; value = newValue ctx
                                ; tsig = sig ctx
                                ; spends = iRef ctx
-                               ; mint = getMintedAmount ctx
+                          --     ; mint = getMintedAmount ctx
                                ; token = (0 , 0)
                                }
 
@@ -709,8 +712,8 @@ record Argument : Set where
     adr  : Address
     oref : TxOutRef
     tn   : TokenName
-    dat  : Datum'
-    inp  : Redeemer'
+    dat  : Datum
+    inp  : Redeemer
     ctx  : ScriptContext 
 open Argument
 
@@ -750,6 +753,7 @@ totalR : Argument -> Set
 totalR arg with Classifier arg
 ... | Initial = getPar (arg .adr) (arg .oref) (arg .tn) ⊢ getMintS (arg .tn) (arg .ctx)
                 × continuing (arg .ctx) ≡ true
+                × getMintedAmount (arg .ctx) ≡ 1
                 × checkTokenOutAddr (arg .adr) (ownAssetClass (arg .tn) (arg .ctx)) (arg .ctx) ≡ true
 
 ... | Running = getPar (arg .adr) (arg .oref) (arg .tn)
@@ -758,10 +762,10 @@ totalR arg with Classifier arg
                 × checkTokenIn (arg .dat .fst) (arg .ctx) ≡ true
                 × checkTokenOut (arg .dat .fst) (arg .ctx) ≡ true 
 ... | Final = getPar (arg .adr) (arg .oref) (arg .tn)
-                 ⊢ getS (arg .dat) (arg .ctx)  ~[ (arg .inp) ]~| getS' (arg .ctx)
+                 ⊢ getS (arg .dat) (arg .ctx)  ~[ (arg .inp) ]~>
                  × continuing (arg .ctx) ≡ false
+                 × getMintedAmount (arg .ctx) ≡ -1
                  × checkTokenIn (arg .dat .fst) (arg .ctx) ≡ true
-                 × checkTokenOut (arg .dat .fst) (arg .ctx) ≡ false 
 
 
 
@@ -782,15 +786,15 @@ map=map : ∀ (l : AccMap) -> (l == l) ≡ true
 map=map [] = refl
 map=map (x ∷ l) rewrite n=n (fst x) | v=v (snd x) = map=map l
 
-checkWithdraw' : AssetClass -> Maybe Value -> PubKeyHash -> Value -> AccMap -> Datum' -> Bool
+checkWithdraw' : AssetClass -> Maybe Value -> PubKeyHash -> Value -> AccMap -> Datum -> Bool
 checkWithdraw' tok Nothing _ _ _ _ = false
 checkWithdraw' tok (Just v) pkh val map (tok' , map') = geq val emptyValue && geq v val && ((tok' , map') == (tok , insert pkh (subValue v val) map))
 
-checkDeposit' : AssetClass -> Maybe Value -> PubKeyHash -> Value -> AccMap -> Datum' -> Bool
+checkDeposit' : AssetClass -> Maybe Value -> PubKeyHash -> Value -> AccMap -> Datum -> Bool
 checkDeposit' tok Nothing _ _ _ _ = false
 checkDeposit' tok (Just v) pkh val map (tok' , map') = geq val emptyValue && ((tok' , map') == (tok , insert pkh (addValue v val) map))
 
-checkTransfer' : AssetClass -> Maybe Value -> Maybe Value -> PubKeyHash -> PubKeyHash -> Value -> AccMap -> Datum' -> Bool
+checkTransfer' : AssetClass -> Maybe Value -> Maybe Value -> PubKeyHash -> PubKeyHash -> Value -> AccMap -> Datum -> Bool
 checkTransfer' tok Nothing _ _ _ _ _ _ = false
 checkTransfer' tok (Just vF) Nothing _ _ _ _ _ = false
 checkTransfer' tok (Just vF) (Just vT) from to val map (tok' , map') = geq val emptyValue && geq vF val && from /= to &&
@@ -798,7 +802,7 @@ checkTransfer' tok (Just vF) (Just vT) from to val map (tok' , map') = geq val e
 
 
 -- Performing a transition implies that the validator returns true
-transitionImpliesValidator : ∀ {par} (d : Datum') (i : Redeemer') (ctx : ScriptContext)
+transitionImpliesValidator : ∀ {par} (d : Datum) (i : Redeemer) (ctx : ScriptContext)
                            -> (par ⊢ getS d ctx ~[ i ]~> getS' ctx
                                × continuing ctx ≡ true
                                × checkTokenIn (d .fst) ctx ≡ true
@@ -816,24 +820,25 @@ transitionImpliesValidator (tok , map) (Transfer from to val) record { inputVal 
 initialImpliesMinting : ∀ (adr : Address) (oref : TxOutRef) (tn : TokenName) (top : ⊤) (ctx : ScriptContext)
                            -> (getPar adr oref tn ⊢ getMintS tn ctx
                                × continuing ctx ≡ true
+                               × getMintedAmount ctx ≡ 1
                                × checkTokenOut (newDatum ctx .fst) ctx ≡ true)
                            -> agdaPolicy adr oref tn top ctx ≡ true
-initialImpliesMinting adr oref tn top record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok , l) ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = mint ; tokCurrSymbol = cs } ((TStart refl refl refl refl refl refl) , refl , refl) rewrite n=n oref | t=t tok = refl 
+initialImpliesMinting adr oref tn top record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok , l) ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; tokCurrSymbol = cs } ((TStart refl refl refl refl refl) , refl , refl , refl) rewrite n=n oref | t=t tok = refl 
 
 
 -- Getting to the terminal state implies that the validator returns true and a token can be burned
-cleanupImpliesBoth : ∀ {tn par} (d : Datum') (adr : Address) (oref : TxOutRef) (ctx : ScriptContext)   
-  -> (par ⊢ getS d ctx ~[ Cleanup ]~| getS' ctx
+cleanupImpliesBoth : ∀ {tn par} (d : Datum) (adr : Address) (oref : TxOutRef) (ctx : ScriptContext)   
+  -> (par ⊢ getS d ctx ~[ Cleanup ]~>
       × continuing ctx ≡ false
-      × checkTokenIn (d .fst) ctx ≡ true
-      × checkTokenOut (d .fst) ctx ≡ false)
+      × getMintedAmount ctx ≡ -1
+      × checkTokenIn (d .fst) ctx ≡ true)
   -> (agdaValidator d Cleanup ctx && agdaPolicy adr oref tn tt ctx) ≡ true
-cleanupImpliesBoth d adr oref ctx ((TCleanup refl refl) , refl , refl , refl) = refl
+cleanupImpliesBoth d adr oref ctx ((TCleanup refl) , refl , refl , refl) = refl
 
 
 
 --Validator returning true implies we can perform a transition
-validatorImpliesTransition : ∀ {par} (d : Datum') (i : Redeemer') (ctx : ScriptContext) 
+validatorImpliesTransition : ∀ {par} (d : Datum) (i : Redeemer) (ctx : ScriptContext) 
                            -> i ≢ Cleanup
                            -> (pf : agdaValidator d i ctx ≡ true)
                            -> (par ⊢ getS d ctx ~[ i ]~> getS' ctx
@@ -925,23 +930,25 @@ mintingImpliesInitial : ∀ (adr : Address) (oref : TxOutRef) (tn : TokenName) (
                            -> (pf : agdaPolicy adr oref tn top ctx ≡ true)
                            -> (getPar adr oref tn ⊢ getMintS tn ctx
                               × continuing ctx ≡ true
+                              × getMintedAmount ctx ≡ 1
                               × checkTokenOut (newDatum ctx .fst) ctx ≡ true)
 mintingImpliesInitial adr oref tn top ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok , l) ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut =  hasTokenOut ; mint = + 1 ; tokCurrSymbol = cs } refl pf
   rewrite  ==Lto≡ l [] (go ((cs , tn) == tok) (get (go (inputRef == oref) (go continues pf))))
-  = (TStart refl  refl (==to≡ inputRef oref (get (go continues pf)))
+  = (TStart refl (==to≡ inputRef oref (get (go continues pf)))
     (==tto≡ (cs , tn) tok (get (get (go (inputRef == oref) (go continues pf))))) refl
-    (==vto≡ outputVal minValue (go hasTokenOut (go (checkDatum adr tn ctx) (go (inputRef == oref) (go continues pf))))) , get pf , (get (go (checkDatum adr tn ctx) (go (inputRef == oref) (go continues pf)))) )
+    (==vto≡ outputVal minValue (go hasTokenOut (go (checkDatum adr tn ctx) (go (inputRef == oref) (go continues pf)))))
+    , get pf , refl , (get (go (checkDatum adr tn ctx) (go (inputRef == oref) (go continues pf)))) )
   
 
 -- Validator returning true and burning a token implies we are in the terminal state 
-bothImplyCleanup : ∀ {tn par} (d : Datum') (adr : Address) (oref : TxOutRef) (ctx : ScriptContext) 
+bothImplyCleanup : ∀ {tn par} (d : Datum) (adr : Address) (oref : TxOutRef) (ctx : ScriptContext) 
                    -> getMintedAmount ctx ≡ -1
                    -> (agdaValidator d Cleanup ctx && agdaPolicy adr oref tn tt ctx) ≡ true
-                   -> (par ⊢ getS d ctx ~[ Cleanup ]~| getS' ctx
+                   -> (par ⊢ getS d ctx ~[ Cleanup ]~>
                       × continuing ctx ≡ false
-                      × checkTokenIn (d .fst) ctx ≡ true
-                      × checkTokenOut (d .fst) ctx ≡ false )
-bothImplyCleanup d adr oref ctx refl pf = (TCleanup (==Lto≡ (snd d) [] (go (not (continuing ctx)) (go (not (checkTokenOut (d . fst) ctx)) (go (checkTokenIn (d . fst) ctx) (get pf))))) refl , (unNot (get (go (not (checkTokenOut (d . fst) ctx)) (go (checkTokenIn (d . fst) ctx) (get pf))))) , (get (get pf)) , (unNot (get (go (checkTokenIn (d . fst) ctx) (get pf)))) )
+                      × getMintedAmount ctx ≡ -1
+                      × checkTokenIn (d .fst) ctx ≡ true )
+bothImplyCleanup d adr oref ctx refl pf = (TCleanup (==Lto≡ (snd d) [] (go (not (continuing ctx)) (go (checkTokenIn (d . fst) ctx) (get pf)))) , (unNot (get (go (checkTokenIn (d . fst) ctx) (get pf)))) , refl , (get (get pf)))
 
 
 -- Lemma for when the input is Close
@@ -980,10 +987,6 @@ totalEquiv = record { to = λ { { arg@record { adr = adr ; oref = oref ; dat = d
                                 { record { adr = adr ; oref = oref ; dat = dat ; inp = (Withdraw pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Withdraw pkh v) ctx x ;
                                 { record { adr = adr ; oref = oref ; dat = dat ; inp = (Transfer from to v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Transfer from to v) ctx x ;
                                 { record { adr = adr ; oref = oref ; dat = dat ; inp = Cleanup ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → cleanupImpliesBoth {0} dat adr oref ctx x } } 
-
-
-
-
 
 
 
