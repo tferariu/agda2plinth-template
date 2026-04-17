@@ -61,32 +61,7 @@ record State : Set where
     mint       : Integer
     token      : AssetClass
 open State
-
-record State : Set where
-  field
-    datum      : Label
-    value      : Value  
-    payVal     : Value
-    tsig       : PubKeyHash
-    continues  : Bool
-    spends     : TxOutRef
-    hasToken   : Bool
-    mint       : Integer
-    token      : AssetClass
-open State
-
-record State : Set where
-  field
-    datum      : Label
-    value      : Value  
-    tsig       : PubKeyHash
-    continues  : Bool
-    spends     : TxOutRef
-    hasToken   : Bool
-    mint       : Integer
-    token      : AssetClass
-open State
-
+  
 -- Model paramets consisting of the combined parameters of the validator and minting policy
 record MParams : Set where
     field
@@ -242,7 +217,7 @@ sameValue : ∀ {v v' pkh pkh' d d' sigs sigs' } {tok tok' : AssetClass}
 sameValue refl = refl
 
 sameSigs : ∀ {v v' pkh pkh' d d' sigs sigs'} {tok tok' : AssetClass}
-  -> (tok , Collecting v pkh d sigs) ≡ (tok' , Collecting v' pkh' d' sigs')  -> sigs ≡ sigs'
+  -> (tok , Collecting v pkh d sigs) ≡ (tok' , Collecting v' pkh' d' sigs') -> sigs ≡ sigs'
 sameSigs refl = refl
 
 reduce∈ : ∀ {A : Set} {x y : A} {xs} -> y ∈ (x ∷ xs) -> y ≢ x -> y ∈ xs
@@ -954,3 +929,7 @@ inputRewrite par s s' Pay (TPay x x₁ x₂ x₃ x₄ x₅ x₆ x₇ x₈) = TPa
 inputRewrite par s s' Cancel (TCancel x x₁ x₂ x₃ x₄ x₅ x₆ x₇) = TCancel x x₁ x₂ x₃ x₄ x₅ x₆ x₇
 
 
+onlyAuthorizedCanSign : ∀ (par : MParams) (s s' : State) (pkh : PubKeyHash)
+  -> pkh ∉ par .authSigs
+  -> ¬ (par ⊢ s ~[ Add pkh ]~> s')
+onlyAuthorizedCanSign par s s' pkh p1 (TAdd x x₁ x₂ x₃ x₄ x₅ x₆ x₇ x₈) = p1 x

@@ -929,3 +929,7 @@ inputRewrite par s s' Pay (TPay x x₁ x₂ x₃ x₄ x₅ x₆ x₇ x₈) = TPa
 inputRewrite par s s' Cancel (TCancel x x₁ x₂ x₃ x₄ x₅ x₆ x₇) = TCancel x x₁ x₂ x₃ x₄ x₅ x₆ x₇
 
 
+onlyAuthorizedCanSign : ∀ (par : MParams) (s s' : State) (pkh : PubKeyHash)
+  -> pkh ∉ par .authSigs
+  -> ¬ (par ⊢ s ~[ Add pkh ]~> s')
+onlyAuthorizedCanSign par s s' pkh p1 (TAdd x x₁ x₂ x₃ x₄ x₅ x₆ x₇ x₈) = p1 x

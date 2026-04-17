@@ -421,3 +421,7 @@ totalEquiv = record { to = λ { {arg@record { par = par ; adr = adr ; oref = ore
 
 
 
+onlyOwnerCanClose : ∀ (par : MParams) (s s' : State)
+  -> s' .tsig ≢ s .datum .snd .owner
+  -> ¬ (par ⊢ s ~[ Close ]~> s')
+onlyOwnerCanClose par s s' p1 ()

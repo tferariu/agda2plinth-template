@@ -146,7 +146,6 @@ data _⊢_~[_]~> : MParams -> State -> Redeemer -> Set where
 
   TCleanup : ∀ {par s}
     -> snd (datum s) ≡ []
-    -- -> mint s' ≡ -1
     -------------------
     -> par ⊢ s ~[ Cleanup ]~>
 
@@ -156,7 +155,7 @@ data _⊢_~[_]~> : MParams -> State -> Redeemer -> Set where
 data _⊢_~[_]~*_ : MParams -> State -> List Redeemer -> State -> Set where
 
   root : ∀ { par s }
-    ------------------
+    ------------------ --make nil TO DO
     -> par ⊢ s ~[ [] ]~* s
 
   cons : ∀ { par s s' s'' i is }
@@ -171,10 +170,10 @@ data _⊢_~[_]~>* : MParams -> State -> List Redeemer -> Set where
   fin : ∀ { par s s' is i }
     -> par ⊢ s ~[ is ]~* s'
     -> par ⊢ s' ~[ i ]~>
-    -------------------------
+    ---------------------------------
     -> par ⊢ s ~[ (is ++ [ i ]) ]~>*
 
-
+ 
 -- Validity predicate
 
 Valid : State -> Set 
@@ -484,6 +483,12 @@ prop1 s@record { datum = (tok , (pkh , v) ∷ map')
 --there exists another state and some inputs such that we can transition
 --there and have no value left in the contract)
 
+liqudity' : ∀ (s : State) (par : MParams) 
+  -> Invariant s
+  -> ∃[ s' ] ∃[ is ] ((par ⊢ s ~[ is ]~* s') × ( ∃[ i ] par ⊢ s' ~[ i ]~> ))
+liqudity' = {!!}
+
+
 liquidity : ∀ (s : State) (par : MParams)
           -> Invariant s
           -> ∃[ is ] par ⊢ s ~[ is ]~>*
@@ -760,7 +765,8 @@ totalR arg with Classifier arg
                 ⊢ getS (arg .dat) (arg .ctx) ~[ (arg .inp) ]~> getS' (arg .ctx)
                 × continuing (arg .ctx) ≡ true
                 × checkTokenIn (arg .dat .fst) (arg .ctx) ≡ true
-                × checkTokenOut (arg .dat .fst) (arg .ctx) ≡ true 
+                × checkTokenOut (arg .dat .fst) (arg .ctx) ≡ true
+                
 ... | Final = getPar (arg .adr) (arg .oref) (arg .tn)
                  ⊢ getS (arg .dat) (arg .ctx)  ~[ (arg .inp) ]~>
                  × continuing (arg .ctx) ≡ false
@@ -855,7 +861,7 @@ validatorImpliesTransition (tok , map) (Open pkh) ctx iv pf | Nothing | tok' , m
              | ==Lto≡ map' (insert pkh emptyValue map) (go (tok' == tok) (get (go (sig ctx == pkh) 
              (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))) 
              = (TOpen refl ((==to≡ (sig ctx) pkh (get (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))) )
-               eq eq2 (==vto≡ (newValue ctx) (oldValue ctx) (go ((tok' , map') == (tok , insert pkh emptyValue map)) (go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))) , (get (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))) , (get pf) , (get (go (checkTokenIn tok ctx) pf)))  
+               eq {!!} (==vto≡ (newValue ctx) (oldValue ctx) (go ((tok' , map') == (tok , insert pkh emptyValue map)) (go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))) , (get (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))) , (get pf) , (get (go (checkTokenIn tok ctx) pf)))  
 
 
 validatorImpliesTransition (tok , map) (Close pkh) ctx iv pf with lookup pkh map in eq
@@ -868,7 +874,7 @@ validatorImpliesTransition (tok , map) (Close pkh) ctx iv pf | Just v | tok' , m
             | ==Lto≡ map' (delete pkh map) (go (tok' == tok) (get (go (v == emptyValue) (go (sig ctx == pkh) 
             (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))) 
             = (TClose refl (==to≡ (sig ctx) pkh (get (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))
-              eq eq2 (==vto≡ (newValue ctx) (oldValue ctx) (go ( (tok' , map') == (tok , delete pkh map)) (go (v == emptyValue)
+              {!!} {!!} (==vto≡ (newValue ctx) (oldValue ctx) (go ( (tok' , map') == (tok , delete pkh map)) (go (v == emptyValue)
               (go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))) , (get (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))) , (get pf) , (get (go (checkTokenIn tok ctx) pf))) 
               
 
@@ -884,7 +890,7 @@ validatorImpliesTransition (tok , map) (Withdraw pkh val) ctx iv pf | Just v | t
             = (TWithdraw refl (==to≡ (sig ctx) pkh (get (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))
             eq (get (get (go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))
             (get (go (geq val emptyValue) (get (go (sig ctx == pkh) (go (continuing ctx)
-            (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))) eq2 
+            (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))) {!!} 
             ((==vto≡ (newValue ctx) (addValue (oldValue ctx) (negValue val)) (go (checkWithdraw' tok (Just v) pkh val map (tok' , map'))
              ((go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))) ) , (get (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))) , (get pf) , (get (go (checkTokenIn tok ctx) pf))) 
 
@@ -898,7 +904,7 @@ validatorImpliesTransition (tok , map) (Deposit pkh val) ctx iv pf | Just v | to
              (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))))
              = (TDeposit refl (==to≡ (sig ctx) pkh (get (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))
              eq (get (get (go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))
-             eq2 (==vto≡ (newValue ctx) (addValue (oldValue ctx) val) (go (checkDeposit' tok (Just v) pkh val map (tok' , map'))
+             {!!} (==vto≡ (newValue ctx) (addValue (oldValue ctx) val) (go (checkDeposit' tok (Just v) pkh val map (tok' , map'))
              ((go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))) , (get (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))) , (get pf) , (get (go (checkTokenIn tok ctx) pf))) 
 
 validatorImpliesTransition (tok , map) (Transfer from to val) ctx iv pf with lookup from map in eq1
@@ -919,7 +925,7 @@ validatorImpliesTransition (tok , map) (Transfer from to val) ctx iv pf | Just v
     (get (go (geq val emptyValue) (get (go (sig ctx == from) 
     (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))))
     (/=to≢ from to (get (go (geq vF val) (go (geq val emptyValue) (get (go (sig ctx == from)
-    (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))))) eq3  
+    (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))))) {!!}  
     (==vto≡ (newValue ctx) (oldValue ctx) (go (checkTransfer' tok (Just vF) (Just vT) from to val map (tok' , map')) (go (sig ctx == from) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))) , (get (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))) , (get pf) , (get (go (checkTokenIn tok ctx) pf))) 
 validatorImpliesTransition (tok , map) Cleanup ctx iv pf = ⊥-elim (iv refl)
 
