@@ -47,3 +47,6 @@ record POSIXTime : Set where
     field
         getPOSIXTime : Integer
 open POSIXTime public
+
+toPOSIXTime : Integer -> POSIXTime
+toPOSIXTime t = record { getPOSIXTime = t }

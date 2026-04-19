@@ -2,18 +2,18 @@ open import Haskell.Prelude
 open import Lib
 open import Value
 
-module Validators.MultiSig where
+module Validators.MultiSig2 where
 
 -- Defining the types of our Plinth Datum, referred to as Label in Agda
-data Info : Set where
-  Holding : Info
-  Collecting : Value -> PubKeyHash -> Integer -> List PubKeyHash -> Info
-
-{-# COMPILE AGDA2HS Info #-}
-
-Datum = (AssetClass × Info)
+data Label : Set where
+  Holding : Label
+  Collecting : Value -> PubKeyHash -> Integer -> List PubKeyHash -> Label
 
 {-# COMPILE AGDA2HS Label #-}
+
+Datum = (AssetClass × Label)
+
+{-# COMPILE AGDA2HS Datum #-}
 
 -- The abstract ScriptContext
 record ScriptContext : Set where
@@ -101,12 +101,12 @@ validRange ctx = ScriptContext.validInterval ctx
 -- The type of the Plinth Redeemer, referred to as Input in Agda
 data Redeemer : Set where
   Propose : Value -> PubKeyHash -> Integer -> Redeemer
-  Add     : PubKeyHash -> Input
-  Pay     : Input
-  Cancel  : Input
-  Close   : Input
+  Add     : PubKeyHash -> Redeemer
+  Pay     : Redeemer
+  Cancel  : Redeemer
+  Stop   : Redeemer
 
-{-# COMPILE AGDA2HS Input #-}
+{-# COMPILE AGDA2HS Redeemer #-}
 
 -- The type of the smart contract parameters
 record Params : Set where
@@ -144,34 +144,34 @@ notTooLate par d ctx = before (record { getPOSIXTime = d - (maxWait par) }) (val
 {-# COMPILE AGDA2HS notTooLate #-}
 
 -- The Validator
-agdaValidator : Params -> Label -> Input -> ScriptContext -> Bool
+agdaValidator : Params -> Datum -> Redeemer -> ScriptContext -> Bool
 agdaValidator param (tok , lab) red ctx = checkTokenIn tok ctx &&
-  (case ((checkTokenOut tok ctx) , lab , red) of λ where
-    (True , Holding , (Propose v pkh d)) ->
-      (newValue ctx == oldValue ctx) && geq (oldValue ctx) v &&
-      lovelaces v >= lovelaces minValue && notTooLate param d ctx && continuing ctx &&
+  (case (lab , red) of λ where
+    (Holding , (Propose v pkh d)) ->
+      (newValue ctx == oldValue ctx) && geq (oldValue ctx) (v + minValue) &&
+      geq v minValue && notTooLate param d ctx && continuing ctx && (checkTokenOut tok ctx) &&
       (case (newDatum ctx) of λ where
         (tok' , Holding) -> False
         (tok' , (Collecting v' pkh' d' sigs')) ->
           v == v' && pkh == pkh' && d == d' && sigs' == [] && tok == tok' )
-    (True , (Collecting v pkh d sigs) , (Add sig)) ->
+    ((Collecting v pkh d sigs) , (Add sig)) ->
       newValue ctx == oldValue ctx && checkSigned sig ctx && query sig (authSigs param) &&
-      continuing ctx && (case (newDatum ctx) of λ where
+      continuing ctx && (checkTokenOut tok ctx) && (case (newDatum ctx) of λ where
         (tok' , Holding) -> False
         (tok' , (Collecting v' pkh' d' sigs')) ->
           v == v' && pkh == pkh' && d == d' && sigs' == insert sig sigs && tok == tok' )
-    (True , (Collecting v pkh d sigs) , Pay) ->
-      (lengthNat sigs) >= (nr param) && continuing ctx && (case (newDatum ctx) of λ where
+    ((Collecting v pkh d sigs) , Pay) ->
+      (lengthNat sigs) >= (nr param) && continuing ctx && (checkTokenOut tok ctx) &&
+      (case (newDatum ctx) of λ where
         (tok' , Holding) -> 
-          checkPayment pkh v ctx && oldValue ctx == ((newValue ctx) + v) &&
-          tok == tok'
+          checkPayment pkh v ctx && ((newValue ctx) + v) == oldValue ctx && tok == tok'
         (tok' , (Collecting v' pkh' d' sigs')) -> False)
-    (True , (Collecting v pkh d sigs) , Cancel) ->
-      newValue ctx == oldValue ctx && continuing ctx &&
+    ((Collecting v pkh d sigs) , Cancel) ->
+      newValue ctx == oldValue ctx && continuing ctx && (checkTokenOut tok ctx) &&
       (case (newDatum ctx) of λ where
         (tok' , Holding) -> expired d ctx && tok == tok'
         (tok' , (Collecting v' pkh' d' sigs')) -> False)
-    (False , Holding , Close) -> lovelaces 2xMinValue > lovelaces (oldValue ctx) && not (continuing ctx) &&
+    (Holding , Stop) -> lovelaces x2MinValue > lovelaces (oldValue ctx) && not (continuing ctx) &&
                                  checkTokenBurned tok ctx
     _ -> False )
 
@@ -185,7 +185,7 @@ checkDatum addr tn ctx = case (newDatumAddr addr ctx) of λ where
   (tok , (Collecting _ _ _ _)) -> False
 
 checkValue : Address -> TokenName -> ScriptContext -> Bool
-checkValue addr tn ctx = lovelaces 2xMinValue < lovelaces (newValueAddr addr ctx) && checkTokenOutAddr addr (ownAssetClass tn ctx) ctx
+checkValue addr tn ctx = geq (newValueAddr addr ctx) x2MinValue && checkTokenOutAddr addr (ownAssetClass tn ctx) ctx
 
 notIn : PubKeyHash -> List PubKeyHash -> Bool
 notIn x [] = True
@@ -196,8 +196,8 @@ noDups [] = True
 noDups (x ∷ xs) = notIn x xs && noDups xs
 
 checkParams : Params -> Bool
-checkParams record { authSigs = authSigs ; nr = nr ; maxWait = maxWait }
-  = (noDups authSigs) && (lengthNat authSigs >= nr) && maxWait > 0 
+checkParams par
+  = (noDups (par .authSigs)) && (lengthNat (par .authSigs) >= par .nr) && par .maxWait > 0 
 
 isInitial : Params -> Address -> TxOutRef -> TokenName -> ScriptContext -> Bool
 isInitial par addr oref tn ctx = consumes oref ctx &&

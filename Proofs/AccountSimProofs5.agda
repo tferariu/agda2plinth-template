@@ -144,18 +144,18 @@ data _⊢_~[_]~>_ : MParams -> State -> Redeemer -> State -> Set where
 
 data _⊢_~[_]~> : MParams -> State -> Redeemer -> Set where
 
-  TCleanup : ∀ {par s}
+  TStop : ∀ {par s}
     -> snd (datum s) ≡ []
     -------------------
-    -> par ⊢ s ~[ Cleanup ]~>
+    -> par ⊢ s ~[ Stop ]~>
 
 
 --Multi-Step Transition
 
 data _⊢_~[_]~*_ : MParams -> State -> List Redeemer -> State -> Set where
 
-  root : ∀ { par s }
-    ------------------ --make nil TO DO
+  nil : ∀ { par s }
+    ----------------------
     -> par ⊢ s ~[ [] ]~* s
 
   cons : ∀ { par s s' s'' i is }
@@ -450,7 +450,7 @@ prop1 : ∀ {tok} {map : AccMap} (s s' : State) {par}
         -> par ⊢ s ~[ (makeIs map) ]~* s'
         
 prop1 record { datum = (tok , []) } record { datum = (tok' , map') }
-  refl refl refl refl refl refl refl p = root
+  refl refl refl refl refl refl refl p = nil
 prop1 s@record { datum = (tok , (pkh , v) ∷ map')
                ; spends = spends ; token = token }
       s'@record { datum = (tok , map'') } refl  refl refl
@@ -483,11 +483,12 @@ prop1 s@record { datum = (tok , (pkh , v) ∷ map')
 --there exists another state and some inputs such that we can transition
 --there and have no value left in the contract)
 
+{-
 liqudity' : ∀ (s : State) (par : MParams) 
   -> Invariant s
   -> ∃[ s' ] ∃[ is ] ((par ⊢ s ~[ is ]~* s') × ( ∃[ i ] par ⊢ s' ~[ i ]~> ))
 liqudity' = {!!}
-
+-}
 
 liquidity : ∀ (s : State) (par : MParams)
           -> Invariant s
@@ -496,9 +497,9 @@ liquidity : ∀ (s : State) (par : MParams)
 
 liquidity s@record { datum = (tok , map) ; spends = spends
   ; token = token } par (p1 , p2) 
-  = ⟨ (makeIs map ++ [ Cleanup ]) ,
+  = ⟨ (makeIs map ++ [ Stop ]) ,
     (fin (prop1 s s' refl refl refl refl p2 refl refl p1)
-    (TCleanup refl) ) ⟩ 
+    (TStop refl) ) ⟩ 
   where
   s' = record
        { datum = tok , []
@@ -532,7 +533,7 @@ lemmaMultiStep : ∀ (s s' s'' : State) (is is' : List Redeemer) {par}
                    -> par ⊢  s  ~[ is  ]~* s'
                    -> par ⊢ s' ~[ is' ]~* s''
                    -> par ⊢ s  ~[ is ++ is' ]~* s''
-lemmaMultiStep s .s s'' [] is' root p2 = p2
+lemmaMultiStep s .s s'' [] is' nil p2 = p2
 lemmaMultiStep s s' s'' (x ∷ is) is' (cons {s' = s'''} p1 p2) p3 = cons p1 (lemmaMultiStep s''' s' s'' is is' p2 p3)
 
 
@@ -603,7 +604,7 @@ userCanRecoverFunds {val} s@record { datum = (tok , map) ; value = v}
   pkh p1 p2 = ⟨ s' , (cons {s' = s'} (TWithdraw refl refl p1
               (geqLem map val (p2 .fst) p1)
               (geq-refl val) (rwDatum pkh val map) refl)
-              root , lookupInsertLemma pkh emptyValue map) ⟩
+              nil , lookupInsertLemma pkh emptyValue map) ⟩
   where
   s' = record
         { datum = tok , (insert pkh emptyValue map)
@@ -718,7 +719,7 @@ record Argument : Set where
     oref : TxOutRef
     tn   : TokenName
     dat  : Datum
-    inp  : Redeemer
+    red  : Redeemer
     ctx  : ScriptContext 
 open Argument
 
@@ -731,23 +732,23 @@ record _≈_ {A : Set} (f : A -> Bool) (R : A -> Set) : Set where
 -- If we burn a token and the input is Close, we are in the Final Phase
 -- Otherwise we are in the Running Phase
 Classifier : Argument -> Phase
-Classifier record { adr = adr ; oref = oref ; dat = dat ; inp = inp ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (+_ zero) } } = Running
-Classifier record { adr = adr ; oref = oref ; dat = dat ; inp = inp ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = +[1+ zero ] } } = Initial
-Classifier record { adr = adr ; oref = oref ; dat = dat ; inp = inp ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = +[1+ N.suc n ] } } = Running
-Classifier record { adr = adr ; oref = oref ; dat = dat ; inp = inp ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc (N.suc n)) } } = Running
-Classifier record { adr = adr ; oref = oref ; dat = dat ; inp = (Open x) ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero)  } } = Running
-Classifier record { adr = adr ; oref = oref ; dat = dat ; inp = (Close x) ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } = Running
-Classifier record { adr = adr ; oref = oref ; dat = dat ; inp = (Withdraw x x₁) ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } = Running
-Classifier record { adr = adr ; oref = oref ; dat = dat ; inp = (Deposit x x₁) ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } = Running
-Classifier record { adr = adr ; oref = oref ; dat = dat ; inp = (Transfer x x₁ x₂) ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } = Running
-Classifier record { adr = adr ; oref = oref ; dat = dat ; inp = Cleanup ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } = Final
+Classifier record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (+_ zero) } } = Running
+Classifier record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = +[1+ zero ] } } = Initial
+Classifier record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = +[1+ N.suc n ] } } = Running
+Classifier record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc (N.suc n)) } } = Running
+Classifier record { adr = adr ; oref = oref ; dat = dat ; red = (Open x) ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero)  } } = Running
+Classifier record { adr = adr ; oref = oref ; dat = dat ; red = (Close x) ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } = Running
+Classifier record { adr = adr ; oref = oref ; dat = dat ; red = (Withdraw x x₁) ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } = Running
+Classifier record { adr = adr ; oref = oref ; dat = dat ; red = (Deposit x x₁) ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } = Running
+Classifier record { adr = adr ; oref = oref ; dat = dat ; red = (Transfer x x₁ x₂) ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } = Running
+Classifier record { adr = adr ; oref = oref ; dat = dat ; red = Stop ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } = Final
 
 -- The Validator as a function returning a boolean
 totalF : Argument -> Bool
 totalF arg with Classifier arg
 ... | Initial = agdaPolicy (arg .adr) (arg .oref) (arg .tn) tt (arg .ctx)
-... | Running = agdaValidator (arg .dat) (arg .inp) (arg .ctx) 
-... | Final = agdaValidator (arg .dat) (arg .inp) (arg .ctx) &&
+... | Running = agdaValidator (arg .dat) (arg .red) (arg .ctx) 
+... | Final = agdaValidator (arg .dat) (arg .red) (arg .ctx) &&
               agdaPolicy (arg .adr) (arg .oref) (arg .tn) tt (arg .ctx)
 
 
@@ -762,13 +763,13 @@ totalR arg with Classifier arg
                 × checkTokenOutAddr (arg .adr) (ownAssetClass (arg .tn) (arg .ctx)) (arg .ctx) ≡ true
 
 ... | Running = getPar (arg .adr) (arg .oref) (arg .tn)
-                ⊢ getS (arg .dat) (arg .ctx) ~[ (arg .inp) ]~> getS' (arg .ctx)
+                ⊢ getS (arg .dat) (arg .ctx) ~[ (arg .red) ]~> getS' (arg .ctx)
                 × continuing (arg .ctx) ≡ true
                 × checkTokenIn (arg .dat .fst) (arg .ctx) ≡ true
                 × checkTokenOut (arg .dat .fst) (arg .ctx) ≡ true
                 
 ... | Final = getPar (arg .adr) (arg .oref) (arg .tn)
-                 ⊢ getS (arg .dat) (arg .ctx)  ~[ (arg .inp) ]~>
+                 ⊢ getS (arg .dat) (arg .ctx)  ~[ (arg .red) ]~>
                  × continuing (arg .ctx) ≡ false
                  × getMintedAmount (arg .ctx) ≡ -1
                  × checkTokenIn (arg .dat .fst) (arg .ctx) ≡ true
@@ -833,19 +834,19 @@ initialImpliesMinting adr oref tn top record { inputVal = inputVal ; outputVal =
 
 
 -- Getting to the terminal state implies that the validator returns true and a token can be burned
-cleanupImpliesBoth : ∀ {tn par} (d : Datum) (adr : Address) (oref : TxOutRef) (ctx : ScriptContext)   
-  -> (par ⊢ getS d ctx ~[ Cleanup ]~>
+stopImpliesBoth : ∀ {tn par i} (d : Datum) (adr : Address) (oref : TxOutRef) (ctx : ScriptContext)   
+  -> (par ⊢ getS d ctx ~[ i ]~>
       × continuing ctx ≡ false
       × getMintedAmount ctx ≡ -1
       × checkTokenIn (d .fst) ctx ≡ true)
-  -> (agdaValidator d Cleanup ctx && agdaPolicy adr oref tn tt ctx) ≡ true
-cleanupImpliesBoth d adr oref ctx ((TCleanup refl) , refl , refl , refl) = refl
+  -> (agdaValidator d i ctx && agdaPolicy adr oref tn tt ctx) ≡ true
+stopImpliesBoth d adr oref ctx ((TStop refl) , refl , refl , refl) = refl
 
 
 
 --Validator returning true implies we can perform a transition
 validatorImpliesTransition : ∀ {par} (d : Datum) (i : Redeemer) (ctx : ScriptContext) 
-                           -> i ≢ Cleanup
+                           -> i ≢ Stop
                            -> (pf : agdaValidator d i ctx ≡ true)
                            -> (par ⊢ getS d ctx ~[ i ]~> getS' ctx
                               × continuing ctx ≡ true
@@ -861,7 +862,7 @@ validatorImpliesTransition (tok , map) (Open pkh) ctx iv pf | Nothing | tok' , m
              | ==Lto≡ map' (insert pkh emptyValue map) (go (tok' == tok) (get (go (sig ctx == pkh) 
              (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))) 
              = (TOpen refl ((==to≡ (sig ctx) pkh (get (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))) )
-               eq {!!} (==vto≡ (newValue ctx) (oldValue ctx) (go ((tok' , map') == (tok , insert pkh emptyValue map)) (go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))) , (get (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))) , (get pf) , (get (go (checkTokenIn tok ctx) pf)))  
+               eq eq2 (==vto≡ (newValue ctx) (oldValue ctx) (go ((tok' , map') == (tok , insert pkh emptyValue map)) (go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))) , (get (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))) , (get pf) , (get (go (checkTokenIn tok ctx) pf)))  
 
 
 validatorImpliesTransition (tok , map) (Close pkh) ctx iv pf with lookup pkh map in eq
@@ -874,7 +875,7 @@ validatorImpliesTransition (tok , map) (Close pkh) ctx iv pf | Just v | tok' , m
             | ==Lto≡ map' (delete pkh map) (go (tok' == tok) (get (go (v == emptyValue) (go (sig ctx == pkh) 
             (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))) 
             = (TClose refl (==to≡ (sig ctx) pkh (get (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))
-              {!!} {!!} (==vto≡ (newValue ctx) (oldValue ctx) (go ( (tok' , map') == (tok , delete pkh map)) (go (v == emptyValue)
+              eq eq2 (==vto≡ (newValue ctx) (oldValue ctx) (go ( (tok' , map') == (tok , delete pkh map)) (go (v == emptyValue)
               (go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))) , (get (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))) , (get pf) , (get (go (checkTokenIn tok ctx) pf))) 
               
 
@@ -890,7 +891,7 @@ validatorImpliesTransition (tok , map) (Withdraw pkh val) ctx iv pf | Just v | t
             = (TWithdraw refl (==to≡ (sig ctx) pkh (get (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))
             eq (get (get (go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))
             (get (go (geq val emptyValue) (get (go (sig ctx == pkh) (go (continuing ctx)
-            (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))) {!!} 
+            (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))) eq2 
             ((==vto≡ (newValue ctx) (addValue (oldValue ctx) (negValue val)) (go (checkWithdraw' tok (Just v) pkh val map (tok' , map'))
              ((go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))) ) , (get (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))) , (get pf) , (get (go (checkTokenIn tok ctx) pf))) 
 
@@ -904,7 +905,7 @@ validatorImpliesTransition (tok , map) (Deposit pkh val) ctx iv pf | Just v | to
              (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))))
              = (TDeposit refl (==to≡ (sig ctx) pkh (get (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))
              eq (get (get (go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))
-             {!!} (==vto≡ (newValue ctx) (addValue (oldValue ctx) val) (go (checkDeposit' tok (Just v) pkh val map (tok' , map'))
+             eq2 (==vto≡ (newValue ctx) (addValue (oldValue ctx) val) (go (checkDeposit' tok (Just v) pkh val map (tok' , map'))
              ((go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))) , (get (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))) , (get pf) , (get (go (checkTokenIn tok ctx) pf))) 
 
 validatorImpliesTransition (tok , map) (Transfer from to val) ctx iv pf with lookup from map in eq1
@@ -925,9 +926,9 @@ validatorImpliesTransition (tok , map) (Transfer from to val) ctx iv pf | Just v
     (get (go (geq val emptyValue) (get (go (sig ctx == from) 
     (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))))
     (/=to≢ from to (get (go (geq vF val) (go (geq val emptyValue) (get (go (sig ctx == from)
-    (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))))) {!!}  
+    (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))))) eq3  
     (==vto≡ (newValue ctx) (oldValue ctx) (go (checkTransfer' tok (Just vF) (Just vT) from to val map (tok' , map')) (go (sig ctx == from) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))) , (get (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))) , (get pf) , (get (go (checkTokenIn tok ctx) pf))) 
-validatorImpliesTransition (tok , map) Cleanup ctx iv pf = ⊥-elim (iv refl)
+validatorImpliesTransition (tok , map) Stop ctx iv pf = ⊥-elim (iv refl)
 
 
 -- Minting the token implies we are in the initial state of our model
@@ -947,52 +948,61 @@ mintingImpliesInitial adr oref tn top ctx@record { inputVal = inputVal ; outputV
   
 
 -- Validator returning true and burning a token implies we are in the terminal state 
-bothImplyCleanup : ∀ {tn par} (d : Datum) (adr : Address) (oref : TxOutRef) (ctx : ScriptContext) 
+bothImplyStop : ∀ {tn par} (d : Datum) (adr : Address) (oref : TxOutRef) (i : Redeemer) (ctx : ScriptContext) 
                    -> getMintedAmount ctx ≡ -1
-                   -> (agdaValidator d Cleanup ctx && agdaPolicy adr oref tn tt ctx) ≡ true
-                   -> (par ⊢ getS d ctx ~[ Cleanup ]~>
+                   -> (agdaValidator d i ctx && agdaPolicy adr oref tn tt ctx) ≡ true
+                   -> (par ⊢ getS d ctx ~[ i ]~>
                       × continuing ctx ≡ false
                       × getMintedAmount ctx ≡ -1
                       × checkTokenIn (d .fst) ctx ≡ true )
-bothImplyCleanup d adr oref ctx refl pf = (TCleanup (==Lto≡ (snd d) [] (go (not (continuing ctx)) (go (checkTokenIn (d . fst) ctx) (get pf)))) , (unNot (get (go (checkTokenIn (d . fst) ctx) (get pf)))) , refl , (get (get pf)))
+bothImplyStop d adr oref (Open pkh) record { tokenIn = tokenIn ; tokenOut = tokenOut ; continues = false } refl p2 = ⊥-elim (get⊥ (sym (go tokenOut (go tokenIn (get p2)))))
+bothImplyStop d adr oref i@(Open pkh) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator d i ctx) p2) ))
+bothImplyStop d adr oref (Close pkh) record { tokenIn = tokenIn ; tokenOut = tokenOut ; continues = false } refl p2 = ⊥-elim (get⊥ (sym (go tokenOut (go tokenIn (get p2)))))
+bothImplyStop d adr oref i@(Close pkh) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator d i ctx) p2) ))
+bothImplyStop d adr oref (Withdraw pkh v) record { tokenIn = tokenIn ; tokenOut = tokenOut ; continues = false } refl p2 = ⊥-elim (get⊥ (sym (go tokenOut (go tokenIn (get p2)))))
+bothImplyStop d adr oref i@(Withdraw pkh v) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator d i ctx) p2) ))
+bothImplyStop d adr oref (Deposit pkh v) record { tokenIn = tokenIn ; tokenOut = tokenOut ; continues = false } refl p2 = ⊥-elim (get⊥ (sym (go tokenOut (go tokenIn (get p2)))))
+bothImplyStop d adr oref i@(Deposit pkh v) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator d i ctx) p2) ))
+bothImplyStop d adr oref (Transfer from to v) record { tokenIn = tokenIn ; tokenOut = tokenOut ; continues = false } refl p2 = ⊥-elim (get⊥ (sym (go tokenOut (go tokenIn (get p2)))))
+bothImplyStop d adr oref i@(Transfer from to v) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator d i ctx) p2) ))
+bothImplyStop d adr oref Stop ctx refl p2 = (TStop (==Lto≡ (snd d) [] (go (not (continuing ctx)) (go (checkTokenIn (d .fst) ctx) (get p2)))) , (unNot (get (go (checkTokenIn (d .fst) ctx) (get p2)))) , refl , (get (get p2)))
 
-
--- Lemma for when the input is Close
-removeCleanup : ∀ {par : MParams} (arg : Argument) -> (getMintedAmount (ctx arg) ≢ (negsuc zero))
-               -> (agdaValidator (arg .dat) (arg .inp) (arg .ctx) ≡ true)
-               -> par ⊢ getS (arg .dat) (arg .ctx)  ~[ (arg .inp) ]~> getS' (arg .ctx)
+-- Lemma for when the input is Stop
+removeStop : ∀ {par : MParams} (arg : Argument) -> (getMintedAmount (ctx arg) ≢ (negsuc zero))
+               -> (agdaValidator (arg .dat) (arg .red) (arg .ctx) ≡ true)
+               -> par ⊢ getS (arg .dat) (arg .ctx)  ~[ (arg .red) ]~> getS' (arg .ctx)
                   × continuing (arg .ctx) ≡ true
                   × checkTokenIn (arg .dat .fst) (arg .ctx) ≡ true
-                  × checkTokenOut (arg .dat .fst) (arg .ctx) ≡ true 
-removeCleanup record { adr = adr₁ ; oref = oref₁ ; dat = dat₁ ; inp = (Open x) ; ctx = ctx₁ } p1 p2 = validatorImpliesTransition dat₁ (Open x) ctx₁ (λ ()) p2
-removeCleanup record { adr = adr₁ ; oref = oref₁ ; dat = dat₁ ; inp = (Close x) ; ctx = ctx₁ } p1 p2 = validatorImpliesTransition dat₁ (Close x) ctx₁ (λ ()) p2
-removeCleanup record { adr = adr₁ ; oref = oref₁ ; dat = dat₁ ; inp = (Withdraw x x₁) ; ctx = ctx₁ } p1 p2 = validatorImpliesTransition dat₁ (Withdraw x x₁) ctx₁ (λ ()) p2
-removeCleanup record { adr = adr₁ ; oref = oref₁ ; dat = dat₁ ; inp = (Deposit x x₁) ; ctx = ctx₁ } p1 p2 = validatorImpliesTransition dat₁ (Deposit x x₁) ctx₁ (λ ()) p2
-removeCleanup record { adr = adr₁ ; oref = oref₁ ; dat = dat₁ ; inp = (Transfer x x₁ x₂) ; ctx = ctx₁ } p1 p2 = validatorImpliesTransition dat₁ (Transfer x x₁ x₂) ctx₁ (λ ()) p2
-removeCleanup record { adr = adr₁ ; oref = oref₁ ; dat = dat₁ ; inp = Cleanup ; ctx = ctx₁ } p1 p2 = ⊥-elim (p1 (==ito≡ (getMintedAmount ctx₁) (negsuc 0) (get (go (checkTokenIn (dat₁ .fst) ctx₁) p2))))
+                  × checkTokenOut (arg .dat .fst) (arg .ctx) ≡ true
+removeStop record { dat = dat ; red = (Open pkh) ; ctx = ctx } p1 p2 = validatorImpliesTransition dat (Open pkh) ctx (λ ()) p2
+removeStop record { dat = dat ; red = (Close pkh) ; ctx = ctx } p1 p2 = validatorImpliesTransition dat (Close pkh) ctx (λ ()) p2
+removeStop record { dat = dat ; red = (Withdraw pkh v) ; ctx = ctx } p1 p2 = validatorImpliesTransition dat (Withdraw pkh v) ctx (λ ()) p2
+removeStop record { dat = dat ; red = (Deposit pkh v) ; ctx = ctx } p1 p2 = validatorImpliesTransition dat (Deposit pkh v) ctx (λ ()) p2
+removeStop record { dat = dat ; red = (Transfer from to v) ; ctx = ctx } p1 p2 = validatorImpliesTransition dat (Transfer from to v) ctx (λ ()) p2
+removeStop record { dat = dat ; red = Stop ; ctx = ctx } p1 p2 = ⊥-elim (p1 (==ito≡ (getMintedAmount ctx) (negsuc 0) (get (go (checkTokenIn (dat .fst) ctx) p2))))
 
 -- The proof of equivalence
 totalEquiv : totalF ≈ totalR
-totalEquiv = record { to = λ { { arg@record { adr = adr ; oref = oref ; dat = dat ; inp = inp ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (+_ zero) } } } x → removeCleanup arg (λ ()) x ;
-                                { record { adr = adr ; oref = oref ; tn = tn ; dat = dat ; inp = inp ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = +[1+ zero ] } } } x → mintingImpliesInitial adr oref tn tt ctx refl x ;
-                                { arg@record { adr = adr ; oref = oref ; dat = dat ; inp = inp ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = +[1+ N.suc n ] } } } x → removeCleanup arg (λ ()) x ;
-                                { arg@record { adr = adr ; oref = oref ; dat = dat ; inp = inp ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc (N.suc n)) } } } x → removeCleanup arg (λ ()) x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; inp = (Open pkh) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Open pkh) ctx (λ ()) x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; inp = (Close pkh) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Close pkh) ctx (λ ()) x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; inp = (Deposit pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Deposit pkh v) ctx (λ ()) x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; inp = (Withdraw pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Withdraw pkh v) ctx (λ ()) x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; inp = (Transfer from to v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Transfer from to v) ctx (λ ()) x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; inp = Cleanup ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → bothImplyCleanup {0} dat adr oref ctx refl x }
-                     ; from = λ { { arg@record { adr = adr ; oref = oref ; dat = dat ; inp = inp ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (+_ zero) } } } x → transitionImpliesValidator dat inp ctx x ;
-                                { record { adr = adr ; oref = oref ; tn = tn ; dat = dat ; inp = inp ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = +[1+ zero ] } } } x → initialImpliesMinting adr oref tn tt ctx x ;
-                                { arg@record { adr = adr ; oref = oref ; dat = dat ; inp = inp ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = +[1+ N.suc n ] } } } x → transitionImpliesValidator dat inp ctx x ;
-                                { arg@record { adr = adr ; oref = oref ; dat = dat ; inp = inp ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc (N.suc n)) } } } x → transitionImpliesValidator dat inp ctx x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; inp = (Open pkh) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Open pkh) ctx x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; inp = (Close pkh) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Close pkh) ctx x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; inp = (Deposit pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Deposit pkh v) ctx x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; inp = (Withdraw pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Withdraw pkh v) ctx x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; inp = (Transfer from to v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Transfer from to v) ctx x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; inp = Cleanup ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → cleanupImpliesBoth {0} dat adr oref ctx x } } 
+totalEquiv = record { to = λ { { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (+_ zero) } } } x → removeStop arg (λ ()) x ;
+                                { record { adr = adr ; oref = oref ; tn = tn ; dat = dat ; red = red ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = +[1+ zero ] } } } x → mintingImpliesInitial adr oref tn tt ctx refl x ;
+                                { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = +[1+ N.suc n ] } } } x → removeStop arg (λ ()) x ;
+                                { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc (N.suc n)) } } } x → removeStop arg (λ ()) x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Open pkh) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Open pkh) ctx (λ ()) x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Close pkh) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Close pkh) ctx (λ ()) x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Deposit pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Deposit pkh v) ctx (λ ()) x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Withdraw pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Withdraw pkh v) ctx (λ ()) x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Transfer from to v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Transfer from to v) ctx (λ ()) x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = Stop ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → bothImplyStop {0} dat adr oref Stop ctx refl x }
+                     ; from = λ { { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (+_ zero) } } } x → transitionImpliesValidator dat red ctx x ;
+                                { record { adr = adr ; oref = oref ; tn = tn ; dat = dat ; red = red ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = +[1+ zero ] } } } x → initialImpliesMinting adr oref tn tt ctx x ;
+                                { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = +[1+ N.suc n ] } } } x → transitionImpliesValidator dat red ctx x ;
+                                { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc (N.suc n)) } } } x → transitionImpliesValidator dat red ctx x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Open pkh) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Open pkh) ctx x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Close pkh) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Close pkh) ctx x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Deposit pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Deposit pkh v) ctx x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Withdraw pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Withdraw pkh v) ctx x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Transfer from to v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Transfer from to v) ctx x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = Stop; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → stopImpliesBoth {0} dat adr oref ctx x } } 
 
 
 

@@ -170,11 +170,26 @@ n≠n n p rewrite n=n n = get⊥ p
 &&5false : ∀ (a b c d e : Bool) -> (a && b && c && d && e && false) ≡ true -> ⊥
 &&5false true true true true true ()
 
+&&6false : ∀ (a b c d e f : Bool) -> (a && b && c && d && e && f && false) ≡ true -> ⊥
+&&6false true true true true true true ()
+
+&&6false' : ∀ {a b c d e f : Bool} -> (a && b && c && d && e && f && false) ≡ true -> ⊥
+&&6false' {false} {b} {c} {d} {e} {f} ()
+&&6false' {true} {false} {c} {d} {e} {f} ()
+&&6false' {true} {true} {false} {d} {e} {f} ()
+&&6false' {true} {true} {true} {false} {e} {f} ()
+&&6false' {true} {true} {true} {true} {false} {f} ()
+&&6false' {true} {true} {true} {true} {true} {false} = λ ()
+&&6false' {true} {true} {true} {true} {true} {true} = λ ()
+
 &&4false : ∀ (a b c d : Bool) -> (a && b && c && d && false) ≡ true -> ⊥
 &&4false true true true true ()
 
 &&2false : ∀ (a b : Bool) -> (a && b && false) ≡ true -> ⊥
 &&2false true true ()
+
+&&3false : ∀ (a b c : Bool) -> (a && b && c && false) ≡ true -> ⊥
+&&3false true true true ()
 
 rewriteJust : ∀ {a : Maybe ℤ} {v v'} -> a ≡ Just v -> v ≡ v' -> a ≡ Just v'
 rewriteJust refl refl = refl

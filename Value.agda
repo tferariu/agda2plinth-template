@@ -50,8 +50,8 @@ emptyValue = MkMap []
 minValue : Value
 minValue = MkMap ((ada , 3) ∷ [])
 
-2xMinValue : Value
-2xMinValue = MkMap ((ada , 6) ∷ [])
+x2MinValue : Value
+x2MinValue = MkMap ((ada , 6) ∷ [])
 
 lovelaces : Value -> Integer
 lovelaces (MkMap []) = 0
@@ -133,6 +133,14 @@ diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False | True | False | True =
 diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False | True | False | False = λ z → z
 diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False | False = λ z → z
 
+{-
+lovelaceDiffLemma' : ∀ (a : Value) (i : Integer)
+  -> lovelaces a ≡ i
+  -> lovelaces (a - minValue) ≡ i - 3
+lovelaceDiffLemma' (MkMap []) i refl = refl
+lovelaceDiffLemma' (MkMap (x ∷ x₁)) i refl = {!!}
+-}
+
 --Postulated properties of Value. 
 
 postulate
@@ -156,7 +164,7 @@ postulate
   notGeqToLt : ∀ (a b : Value) -> geq a b ≡ False -> lt a b ≡ True
   ltToGt : ∀ (a b : Value) -> lt a b ≡ True -> gt b a ≡ True
   geqTrans : ∀ (a b c : Value) -> geq a b ≡ True -> geq b c ≡ True -> geq a c ≡ True
-  
+
   sumLemma : ∀ (a b : Value)
            -> geq a emptyValue ≡ True
            -> geq b emptyValue ≡ True
@@ -165,7 +173,34 @@ postulate
   diffLemma : ∀ (a b : Value)
             -> geq a b ≡ True
             -> geq (subValue a b) emptyValue ≡ True
-            
-  lovelaceLemma : ∀ (a b : Value) -> geq a b ≡ True -> (lovelaces a >= lovelaces b) ≡ True
 
+{-
+  subLemma : ∀ (a b : Value)
+           -> geq b emptyValue ≡ True
+           -> geq a (subValue a b) ≡ True
+
+
+  geqSum : ∀ (a b c : Value)
+           -> geq a (addValue b c) ≡ True
+           -> geq c emptyValue ≡ True
+           -> geq a b ≡ True
+  
+  -}
+
+  geqAddTrans : ∀ (a b c d : Value)
+              -> geq a (addValue b c) ≡ True
+              -> geq b d ≡ True
+              -> geq a (addValue d c) ≡ True
+
+  geqSub : ∀ (a b c : Value)
+         -> geq a (addValue b c) ≡ True
+         -> geq (subValue a b) c ≡ True
+         
+ -- lovelaceLemma : ∀ (a b : Value) -> geq a b ≡ True -> (lovelaces a >= lovelaces b) ≡ True
+
+ -- lovelaceSumLemma : ∀ (a b : Value) -> lovelaces (addValue a b) ≡ lovelaces a + lovelaces b
+  
+  lovelaceLemma : ∀ (a : Value) 
+                        -> (lovelaces a >= lovelaces x2MinValue) ≡ True
+                        -> geq a x2MinValue ≡ True
   

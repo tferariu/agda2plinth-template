@@ -102,7 +102,7 @@ data Redeemer : Set where
   Withdraw : PubKeyHash -> Value -> Redeemer
   Deposit  : PubKeyHash -> Value -> Redeemer
   Transfer : PubKeyHash -> PubKeyHash -> Value -> Redeemer
-  Cleanup  : Redeemer
+  Stop     : Redeemer
 
 {-# COMPILE AGDA2HS Redeemer #-}
 
@@ -181,7 +181,7 @@ agdaValidator (tok , map) inp ctx = checkTokenIn tok ctx && (case inp of λ wher
                               checkTransfer tok (lookup from map) (lookup to map) from to val map ctx &&
                               newValue ctx == oldValue ctx 
 
-    Cleanup -> checkTokenBurned tok ctx && not (continuing ctx) && map == [] )
+    Stop -> checkTokenBurned tok ctx && not (continuing ctx) && map == [] )
 
 {-# COMPILE AGDA2HS agdaValidator #-}
 
