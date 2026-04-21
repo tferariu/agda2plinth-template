@@ -1,5 +1,5 @@
 open import Lib
-open import Haskell.Prelude
+open import Haskell.Prelude hiding (lookup)
 open import Relation.Binary.PropositionalEquality.Core
 
 module Value where
@@ -11,14 +11,31 @@ module Value where
 
 Value = Map AssetClass Integer
 
+lookupValue : AssetClass -> List (AssetClass × Integer) -> Integer
+lookupValue ac [] = 0
+lookupValue ac ((ac' , val') ∷ xs) =
+  if ac == ac' then val'
+               else lookupValue ac xs
+
+deleteValue : AssetClass -> List (AssetClass × Integer) -> List (AssetClass × Integer) 
+deleteValue ac [] = []
+deleteValue ac ((ac' , val') ∷ xs) =
+  if ac == ac' then xs
+               else (ac' , val') ∷ (deleteValue ac xs)
+
 addValueAux : List (AssetClass × Integer) -> List (AssetClass × Integer) -> List (AssetClass × Integer)
 addValueAux [] [] = []
 addValueAux [] (v ∷ vs) = v ∷ vs
 addValueAux (v ∷ vs) [] = v ∷ vs
 addValueAux v1@((ac , val) ∷ xs) v2@((ac' , val') ∷ ys)
+  = (ac , val + (lookupValue ac v2)) ∷ addValueAux xs (deleteValue ac v2)
+
+{-
+addValueAux v1@((ac , val) ∷ xs) v2@((ac' , val') ∷ ys)
   = if (ac == ac') then (ac , val + val') ∷ (addValueAux xs ys)
                    else (if (ac < ac') then (ac , val) ∷ (addValueAux xs v2)
                                        else (ac' , val') ∷ (addValueAux v1 ys))
+-}
 
 addValue : Value -> Value -> Value
 addValue (MkMap v1) (MkMap v2) = MkMap (addValueAux v1 v2)
@@ -29,8 +46,16 @@ negValue (MkMap xs) = MkMap (map (λ (k , v) → (k , (negateInteger v))) xs)
 subValue : Value -> Value -> Value
 subValue v1 v2 = addValue v1 (negValue v2)
 
+eqValueAux : List (AssetClass × Integer) -> List (AssetClass × Integer) -> Bool
+eqValueAux [] [] = True
+eqValueAux [] (x ∷ xs) = if x .snd == 0 then eqValueAux [] xs else False
+eqValueAux (x ∷ xs) [] = if x .snd == 0 then eqValueAux xs [] else False
+eqValueAux v1@((ac , val) ∷ xs) v2@((ac' , val') ∷ ys)
+  = if val == (lookupValue ac v2) then eqValueAux xs (deleteValue ac v2)
+                                  else False
+
 eqValue : Value -> Value -> Bool
-eqValue (MkMap x) (MkMap y) = x == y
+eqValue (MkMap x) (MkMap y) = eqValueAux x y 
 
 leq : Value -> Value -> Bool
 leq (MkMap x) (MkMap y) = x <= y
@@ -154,7 +179,9 @@ postulate
 
   addValIdR : ∀ (a : Value) -> a + emptyValue ≡ a
   
-  switchSides : ∀ (a b c : Value) -> a + b ≡ c -> a ≡ c - b
+  switchSides  : ∀ (a b c : Value) -> a - b ≡ c -> a ≡ c + b
+  switchSides' : ∀ (a b c : Value) -> a + b ≡ c -> a ≡ c - b
+  
   doubleNeg : ∀ (a : Value) -> a ≡ negValue (negValue a)
 
   v-v : ∀ (a : Value) -> subValue a a ≡ emptyValue
@@ -204,3 +231,9 @@ postulate
                         -> (lovelaces a >= lovelaces x2MinValue) ≡ True
                         -> geq a x2MinValue ≡ True
   
+
+
+switchSides'' : ∀ (a b c : Value) -> a + b ≡ c -> a ≡ c - b
+switchSides'' a b c p rewrite doubleNeg b | sym p
+  | (assocVal a (negValue (negValue b)) (negValue (negValue (negValue b))))
+  | v-v (negValue (negValue b)) | addValIdR a = refl 

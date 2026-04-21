@@ -1,12 +1,12 @@
-open import Validators.AccountSim4
+open import Validators.AccountSim6
 open import Lib
-open import Value
+open import Value hiding (addValue; subValue)
 
 open import Agda.Builtin.Char
 open import Agda.Builtin.Equality
 open import Agda.Builtin.Bool
 import Data.Nat as N
-open import Data.Integer 
+open import Data.Integer hiding (_+_; _-_)
 open import Data.Integer.Properties
 open import Agda.Builtin.Int
 open import Agda.Builtin.Nat renaming (_==_ to eqNat; _<_ to ltNat; _+_ to addNat; _-_ to monusNat; _*_ to mulNat)
@@ -25,11 +25,13 @@ open import Haskell.Prim.Maybe
 open import Haskell.Prim.Tuple
 open import Haskell.Prim.Ord using (_<=_ ; _>=_)
 open import Haskell.Prim using (lengthNat)
+open import Haskell.Prelude using (_+_ ; _-_)
 open import Function.Base using (_∋_)
 open _×_×_
+
 open import ProofLib
 
-module Proofs.AccountSimProofs5 where
+module Proofs.AccountSimProofs6 where
 
 -- Model and proofs for the Account Simulation contract
   
@@ -41,57 +43,44 @@ record State : Set where
     value      : Value  
     tsig       : PubKeyHash
     spends     : TxOutRef
-    --mint       : Integer
     token      : AssetClass
 open State
 
 -- Extra definitions necessary for the model
-
-{-
-sumIVal : AccMap -> Value
-sumIVal [] = emptyValue
-sumIVal ((k , v) ∷ xs) = addValue v (sumIVal xs)
-
-internalVal : State -> Value
-internalVal s = addValue (sumIVal (accMap s)) minValue
-
-internalVal' : AccMap -> Value
-internalVal' [] = minValue
-internalVal' ((k , v) ∷ xs) = addValue v (internalVal' xs)-}
-
 
 accMap : State -> AccMap
 accMap s = s .datum .snd
 
 sumVal : AccMap -> Value
 sumVal [] = emptyValue
-sumVal ((k , v) ∷ xs) = addValue v (sumVal xs)
+sumVal ((k , v) ∷ xs) = v + sumVal xs
 
 internalVal : State -> Value
-internalVal s = addValue (sumVal (accMap s)) minValue
+internalVal s = sumVal (accMap s) + minValue + assetClassValue (s .datum .fst) 1
 
-sumVal' : AccMap -> Value
-sumVal' [] = minValue
-sumVal' ((k , v) ∷ xs) = addValue v (sumVal' xs)
+iVal : AccMap -> AssetClass -> Value
+iVal [] ac = minValue + assetClassValue ac 1
+iVal ((k , v) ∷ xs) ac = v + (iVal xs) ac
 
 internalVal' : State -> Value
-internalVal' s = sumVal' (accMap s)
+internalVal' s = iVal (accMap s) (s .datum .fst)
 
-sVal≡ : ∀ (map : AccMap)
-  -> addValue (sumVal map) minValue ≡ sumVal' map
-sVal≡ [] = refl
-sVal≡ (x ∷ map) rewrite assocVal (x .snd) (sumVal map) minValue
-  = cong (λ y → addValue (x .snd) y) (sVal≡ map)
+iVal≡' : ∀ (map : AccMap) (ac : AssetClass)
+  -> sumVal map + minValue + assetClassValue ac 1 ≡ iVal map ac
+iVal≡' [] ac = refl
+iVal≡' (x ∷ map) ac rewrite assocVal (x .snd) (sumVal map) minValue
+  | assocVal (x .snd) (sumVal map + minValue) (assetClassValue ac 1)
+  = cong (λ y → (x .snd) + y) (iVal≡' map ac)
   
 iVal≡ : ∀ (s : State) -> internalVal s ≡ internalVal' s
-iVal≡ s = sVal≡ (s .datum .snd)
+iVal≡ s = iVal≡' (s .datum .snd) (s .datum .fst)
 
 
 -- Model parameters consisting of the combined parameters of the validator and minting policy
 
 record MParams : Set where
     field
-        validatorAddress : Address
+       -- validatorAddress : Address
         uniqueId         : TxOutRef
         threadTokName    : TokenName
 open MParams public
@@ -102,13 +91,11 @@ open MParams public
 
 data _⊢_ : MParams -> State -> Set where
 
-  TStart : ∀ {par s tok}
-    -> datum s ≡ ( tok , [] )
-    -- -> mint s ≡ 1
+  TStart : ∀ {par s}
+    -> datum s ≡ ( token s , [] )
     -> spends s ≡ uniqueId par 
-    -> token s ≡ tok
     -> token s .snd ≡ threadTokName par
-    -> value s ≡ minValue
+    -> value s ≡ minValue + assetClassValue (token s) 1
     -------------------
     -> par ⊢ s
 
@@ -139,8 +126,8 @@ data _⊢_~[_]~>_ : MParams -> State -> Redeemer -> State -> Set where
     -> tsig s' ≡ pkh
     -> lookup pkh map ≡ Just v
     -> geq val emptyValue ≡ true
-    -> datum s' ≡ (tok , (insert pkh (addValue v val) map))
-    -> value s' ≡ addValue (value s) val
+    -> datum s' ≡ (tok , (insert pkh (v + val) map))
+    -> value s' ≡ (value s) + val
     -------------------
     -> par ⊢  s ~[ (Deposit pkh val) ]~> s'
     
@@ -150,8 +137,8 @@ data _⊢_~[_]~>_ : MParams -> State -> Redeemer -> State -> Set where
     -> lookup pkh map ≡ Just v
     -> geq val emptyValue ≡ true
     -> geq v val ≡ true
-    -> datum s' ≡ (tok , (insert pkh (subValue v val) map))
-    -> value s' ≡ subValue (value s) val 
+    -> datum s' ≡ (tok , (insert pkh (v - val) map))
+    -> value s' ≡ (value s) - val 
     -------------------
     -> par ⊢ s ~[ (Withdraw pkh val) ]~> s'
     
@@ -163,8 +150,8 @@ data _⊢_~[_]~>_ : MParams -> State -> Redeemer -> State -> Set where
     -> geq val emptyValue ≡ true
     -> geq vF val ≡ true
     -> from ≢ to
-    -> datum s' ≡ (tok , (insert from (subValue vF val)
-                         (insert to (addValue vT val) map)))
+    -> datum s' ≡ (tok , (insert from (vF - val)
+                         (insert to (vT + val) map)))
     -> value s' ≡ value s
     -------------------
     -> par ⊢ s ~[ (Transfer from to val) ]~> s'
@@ -245,7 +232,7 @@ initialValidity : ∀ {s par}
   -> par ⊢ s
   -> valid s 
 initialValidity {record { datum = .(_ , [])}}
-                (TStart refl p3 p4 p5 p6 ) = allNil
+                (TStart refl p2 p3 p4) = allNil
 
 validity : ∀ {s s' i par}
   -> valid s
@@ -262,23 +249,23 @@ validity {record { datum = tok , map }}
          (TClose refl p2 p3 refl p5) = (delem map p)
       
 validity {record { datum = tok , map }}
-         {record { datum = .(_ , insert _ (addValue v val) map) }} p
+         {record { datum = .(_ , insert _ (v + val) map) }} p
          (TDeposit {val = val} {v = v} refl p2 p3 p4 refl p6)
-         = lem map (addValue v val)
+         = lem map (v + val)
            (sumLemma v val (geqLem map v p p3) p4) p
          
 validity {record { datum = tok , map }}
-         {record { datum = .(_ , insert _ (subValue v val) map) }} p
+         {record { datum = .(_ , insert _ (v - val) map) }} p
          (TWithdraw {val = val} {v = v} refl p2 p3 p4 p5 refl refl)
-         = (lem map (subValue v val) (diffLemma v val p5) p)
+         = (lem map (v - val) (diffLemma v val p5) p)
          
 validity {record { datum = tok , map }}
-         {record { datum = .(_ , insert from (subValue vF val)
-                                (insert to (addValue vT val) map)) }} p
+         {record { datum = .(_ , insert from (vF - val)
+                                (insert to (vT + val) map)) }} p
          (TTransfer {par} {from} {to} {val} {vF = vF} {vT = vT}
                     refl p2 p3 p4 p5 p6 p7 refl p9)
-         = lem (insert to (addValue vT val) map) (subValue vF val) (diffLemma vF val p6)
-           (lem map (addValue vT val) (sumLemma vT val (geqLem map vT p p4) p5) p)
+         = lem (insert to (vT + val) map) (vF - val) (diffLemma vF val p6)
+           (lem map (vT + val) (sumLemma vT val (geqLem map vT p p4) p5) p)
 
 
 
@@ -286,11 +273,6 @@ validity {record { datum = tok , map }}
 
 fides : State -> Set
 fides s = value s ≡ internalVal s
-
-
-
-fides' : State -> Set
-fides' s = value s ≡ internalVal' s --(accMap s)
 
 -- Lemmas for Fidelity
 
@@ -300,73 +282,69 @@ maybe⊥ ()
 maybe≡ : ∀ {a b : Value} -> Just a ≡ Just b → a ≡ b
 maybe≡ refl = refl
 
-svLemma1 : ∀ {pkh} (map : AccMap)
-           -> lookup pkh map ≡ Nothing
-           -> sumVal map ≡ sumVal (insert pkh emptyValue map)
 
-svLemma1 {pkh} [] p = refl
-svLemma1 {pkh} (x ∷ map) p with pkh == (fst x)
-...| false = cong (λ a → addValue (x .snd) a) (svLemma1 map p)
+iValLemma1 : ∀ {pkh} (map : AccMap) (ac : AssetClass)
+           -> lookup pkh map ≡ Nothing
+           -> iVal map ac ≡ iVal (insert pkh emptyValue map) ac
+
+
+iValLemma1 {pkh} [] ac p = refl
+iValLemma1 {pkh} (x ∷ map) ac p with pkh == (fst x)
+...| false = cong (λ a → (x .snd) + a) (iValLemma1 map ac p)
 ...| true = ⊥-elim (maybe⊥ (sym p))
 
-svLemma2 : ∀ {pkh} (map : AccMap)
+
+iValLemma2 : ∀ {pkh} (map : AccMap) (ac : AssetClass)
            -> lookup pkh map ≡ Just emptyValue
-           -> sumVal map ≡ sumVal (delete pkh map)
+           -> iVal map ac ≡ iVal (delete pkh map) ac
            
-svLemma2 [] p = refl
-svLemma2 {pkh} (x ∷ map) p with pkh == (fst x)
-...| false = cong (λ a → addValue (x .snd) a) (svLemma2 map p)
-...| true rewrite maybe≡ p = addValIdL (sumVal map)
+iValLemma2 [] ac p = refl
+iValLemma2 {pkh} (x ∷ map) ac p with pkh == (fst x)
+...| false = cong (λ a → (x .snd) + a) (iValLemma2 map ac p)
+...| true rewrite maybe≡ p = addValIdL (iVal map ac)
 
 
-svLemma3 : ∀ {pkh v val} (map : AccMap)
+iValLemma3 : ∀ {pkh v val} (map : AccMap) (ac : AssetClass)
            -> lookup pkh map ≡ Just v
-           -> addValue (sumVal map) val ≡
-              sumVal (insert pkh (addValue v val) map)
-              
-svLemma3' : ∀ {pkh v val} (map : AccMap)
-           -> lookup pkh map ≡ Just v
-           -> addValue (sumVal' map) val ≡
-              sumVal' (insert pkh (addValue v val) map)
-svLemma3' = {!!}
+           -> (iVal map ac) + val ≡
+              iVal (insert pkh (v + val) map) ac
 
-svLemma3 [] p = ⊥-elim (maybe⊥ p) 
-svLemma3 {pkh} {v} {val} (x ∷ l) p with pkh == (fst x)
-...| false rewrite (assocVal (snd x) (sumVal l) val)
-     = cong (λ a → addValue (snd x) a) (svLemma3 l p)
-...| true rewrite maybe≡ p | assocVal v (sumVal l) val
-                | commVal (sumVal l) val
-                | assocVal v val (sumVal l) = refl
+
+iValLemma3 [] ac p = ⊥-elim (maybe⊥ p) 
+iValLemma3 {pkh} {v} {val} (x ∷ map) ac p with pkh == (fst x)
+...| false rewrite (assocVal (snd x) (iVal map ac) val)
+     = cong (λ a → (snd x) + a) (iValLemma3 map ac p)
+...| true rewrite maybe≡ p | assocVal v (iVal map ac) val
+                | commVal (iVal map ac) val
+                | assocVal v val (iVal map ac) = refl
                     
 
-svLemma5 : ∀ {from to vF vT val} (map : AccMap)
+iValLemma4 : ∀ {from to vF vT val} (map : AccMap) (ac : AssetClass)
            -> lookup from map ≡ Just vF
            -> lookup to map ≡ Just vT
            -> from ≢ to
-           -> sumVal map ≡ sumVal (insert from (subValue vF val)
-                           (insert to (addValue vT val) map))
+           -> iVal map ac ≡ iVal (insert from (vF - val)
+                           (insert to (vT + val) map)) ac
 
-svLemma5 {from} {to} {vF} {vT} {val} (x ∷ map) p1 p2 p3 with to == (fst x) in eq1
-svLemma5 {from} {to} {vF} {vT} {val} (x ∷ map) p1 p2 p3 | true with from == to in eq2
-svLemma5 {from} {to} {vF} {vT} {val} (x ∷ map) p1 p2 p3 | true | true = ⊥-elim (p3 (==to≡ from to eq2))
-svLemma5 {from} {to} {vF} {vT} {val} (x ∷ map) p1 p2 p3 | true | false with from == (fst x) in eq3
-svLemma5 {from} {to} {vF} {vT} {val} (x ∷ map) p1 p2 p3 | true | false | true 
+iValLemma4 {from} {to} {vF} {vT} {val} (x ∷ map) ac p1 p2 p3 with to == (fst x) in eq1
+iValLemma4 {from} {to} {vF} {vT} {val} (x ∷ map) ac p1 p2 p3 | true with from == to in eq2
+iValLemma4 {from} {to} {vF} {vT} {val} (x ∷ map) ac p1 p2 p3 | true | true = ⊥-elim (p3 (==to≡ from to eq2))
+iValLemma4 {from} {to} {vF} {vT} {val} (x ∷ map) ac p1 p2 p3 | true | false with from == (fst x) in eq3
+iValLemma4 {from} {to} {vF} {vT} {val} (x ∷ map) ac p1 p2 p3 | true | false | true 
          rewrite ==to≡ to (fst x) eq1 | ==to≡ from (fst x) eq3 = ⊥-elim (p3 refl)
-svLemma5 {from} {to} {vF} {vT} {val} (x ∷ map) p1 p2 p3 | true | false | false
-         rewrite (maybe≡ p2) | assocVal vT val (sumVal (insert from (subValue vF val) map))
-         | commVal val (sumVal (insert from (addValue vF (negValue val)) map)) | doubleNeg val 
-         = cong (λ a → addValue vT a) (switchSides (sumVal map) (negValue val)
-           (sumVal (insert from (addValue vF (negValue (negValue (negValue val)))) map))
-           (subst (λ x → addValue (sumVal map) (negValue val) ≡ sumVal
-           (insert from (addValue vF (negValue x)) map)) (doubleNeg val) (svLemma3 map p1)))
-svLemma5 {from} {to} {vF} {vT} {val} (x ∷ map) p1 p2 p3 | false with from == (fst x) in eq2
-svLemma5 {from} {to} {vF} {vT} {val} (x ∷ map) p1 p2 p3 | false | true
-         rewrite (maybe≡ p1) | assocVal vF (negValue val) (sumVal (insert to (addValue vT val) map))
-         | commVal (negValue val) (sumVal (insert to (addValue vT val) map))
-         = cong (λ a → addValue vF a) (switchSides (sumVal map) val
-           (sumVal (insert to (addValue vT val) map)) (svLemma3 map p2))
-svLemma5 {from} {to} {vF} {vT} {val} (x ∷ map) p1 p2 p3 | false | false
-         = cong (λ a → addValue (snd x) a) (svLemma5 map p1 p2 p3)
+iValLemma4 {from} {to} {vF} {vT} {val} (x ∷ map) ac p1 p2 p3 | true | false | false
+         rewrite (maybe≡ p2) | assocVal vT val (iVal (insert from (vF - val) map) ac)
+         | commVal val (iVal (insert from (vF - val) map) ac)
+         = cong (λ a → vT + a) (switchSides (iVal map ac) val
+         (iVal (insert from (vF - val) map) ac) (iValLemma3 map ac p1))
+iValLemma4 {from} {to} {vF} {vT} {val} (x ∷ map) ac p1 p2 p3 | false with from == (fst x) in eq2
+iValLemma4 {from} {to} {vF} {vT} {val} (x ∷ map) ac p1 p2 p3 | false | true
+         rewrite (maybe≡ p1) | assocVal vF (negValue val) (iVal (insert to (vT + val) map) ac)
+         | commVal (negValue val) (iVal (insert to (vT + val) map) ac) 
+         = cong (λ a → vF + a) (switchSides' (iVal map ac) val
+         (iVal (insert to (vT + val) map) ac) (iValLemma3 map ac p2))
+iValLemma4 {from} {to} {vF} {vT} {val} (x ∷ map) ac p1 p2 p3 | false | false
+         = cong (λ a → (snd x) + a) (iValLemma4 map ac p1 p2 p3)
 
 -- Fidelity Proof
 
@@ -374,52 +352,33 @@ initialFidelity : ∀ {s par}
   -> par ⊢ s
   -> fides s
 initialFidelity {record { datum = .(_ , []) }}
-                (TStart refl x₂ x₃ x₄ x₅) = x₅
+                (TStart refl x₂ x₃ x₄) = x₄ 
 
-fidelity' : ∀ {s s' i par}
-         -> fides' s
-         -> par ⊢ s ~[ i ]~> s'
-         -> fides' s'
-
-fidelity' = {!!}
 
 fidelity : ∀ {s s' i par}
          -> fides s
          -> par ⊢ s ~[ i ]~> s'
          -> fides s'
          
-fidelity {record { datum = tok , map }} pf
-         (TOpen refl p2 p3 p4 p5) rewrite pf | p5 | p4
-         = {!!} --svLemma1 map p3
+fidelity {s@record { datum = tok , map }} {s'} refl
+         (TOpen refl p2 p3 refl refl)
+         rewrite iVal≡ s | iVal≡ s' = iValLemma1 map tok p3
+       
+fidelity {s@record { datum = tok , map }} {s'} refl
+         (TClose refl p2 p3 refl refl)
+         rewrite iVal≡ s | iVal≡ s' = iValLemma2 map tok p3
          
-fidelity {record { datum = tok , map }} pf
-         (TClose refl p2 p3 p4 p5) rewrite pf | p5 | p4
-         = {!!} --svLemma2 map p3
+fidelity {s@record { datum = tok , map }} {s'} refl
+         (TDeposit refl p2 p3 p4 refl refl) 
+         rewrite iVal≡ s | iVal≡ s' = iValLemma3 map tok p3
          
-fidelity {record { datum = tok , map }} pf
-         (TDeposit refl p2 p3 p4 p5 p6) rewrite p5 | p6 | pf
-         = {!!} --svLemma3 map p3
-         
-fidelity {s@record { datum = tok , map }} {s'} pf
-         (TWithdraw {val = val} {v = v} refl refl p3 p4 p5 p6 p7)
-         rewrite pf | p6 | p7 --iVal≡ s | iVal≡ s' |
-         = {!!} --svLemma3' map p3
+fidelity {s@record { datum = tok , map }} {s'} refl
+         (TWithdraw refl p2 p3 p4 p5 refl refl)
+         rewrite iVal≡ s | iVal≡ s' = iValLemma3 map tok p3
 
-{-
-| assocVal (sumVal map) minValue (negValue val) |
-         commVal minValue (negValue val) |
-         sym (assocVal (sumVal map) (negValue val) minValue)
-         = cong (λ x → addValue x minValue) (svLemma3 map p3)-}
-
---svLemma3 map p3
-
-       --    -> addValue (sumIVal map) val ≡
-        --      sumIVal (insert pkh (addValue v val) map)
-
-fidelity {record { datum = tok , map }} pf
-         (TTransfer refl p2 p3 p4 p5 p6 p7 p8 p9)
-         rewrite p8 | p9 | pf
-         = {!!} --svLemma5 map p3 p4 p7
+fidelity {s@record { datum = tok , map }} {s'} refl
+         (TTransfer refl p2 p3 p4 p5 p6 p7 refl refl)
+         rewrite iVal≡ s | iVal≡ s' = iValLemma4 map tok p3 p4 p7
 
 
 -- Combined state invariant predicate
@@ -474,11 +433,11 @@ rwInsertDelete : ∀ {a : AssetClass} {b : Bool} { x y z : AccMap }
 rwInsertDelete refl refl = refl
 
 rwAccMap : ∀ (pkh : PubKeyHash) (val : Value) (map : AccMap)
-           -> (pkh , subValue val val) ∷ map ≡ (pkh , emptyValue) ∷ map
+           -> (pkh , val - val) ∷ map ≡ (pkh , emptyValue) ∷ map
 rwAccMap pkh val map rewrite (v-v val) = refl
 
 rwVal : ∀ (v1 v2 : Value)
-            -> v1 ≡ addValue (addValue v2 v1) (negValue v2)
+            -> v1 ≡ (v2 + v1) - v2 
 rwVal v1 v2 rewrite commVal v2 v1
             | assocVal v1 v2 (negValue v2)
             | v-v v2 = sym (addValIdR v1)
@@ -498,9 +457,9 @@ subGeq map (allCons {{i}} {{is}}) = i
 prop1 : ∀ {tok} {map : AccMap} (s s' : State) {par}
         -> datum s ≡ (tok , map)
         -> datum s' ≡ (tok , [])
-        -> value s' ≡ minValue
+        -> value s' ≡ minValue + assetClassValue tok 1
         -> tsig s' ≡ lastSig map (tsig s)
-        -> value s ≡ addValue (sumVal map) minValue --sumIVal map
+        -> value s ≡ iVal map tok --addValue (sumVal map) minValue --sumIVal map
         -> spends s ≡ spends s'
         -- -> mint s ≡ mint s'
         -> token s ≡ token s'
@@ -508,14 +467,14 @@ prop1 : ∀ {tok} {map : AccMap} (s s' : State) {par}
         -> par ⊢ s ~[ (makeIs map) ]~* s'
         
 prop1 record { datum = (tok , []) } record { datum = (tok' , map') }
-  refl refl refl refl refl refl refl p = nil --nil
+  refl refl refl refl refl refl refl p = nil
 prop1 s@record { datum = (tok , (pkh , v) ∷ map')
                ; spends = spends ; token = token }
       s'@record { datum = (tok , map'') } refl  refl refl
       refl refl refl refl p
       = cons {s' = st} (TWithdraw refl refl (rwLookup (n=n pkh))
         (subGeq map' p) (geq-refl v) (rwInsertDelete (n=n pkh)
-        (rwAccMap pkh v map')) {!!} ) --(rwVal (value st) v)) 
+        (rwAccMap pkh v map')) (rwVal (value st) v)) 
         (cons {s' = st'} (TClose refl refl (rwLookup (n=n pkh))
         (rwInsertDelete (n=n pkh) refl) refl )
         (prop1 st' s' refl refl refl (sameLastSig map')
@@ -525,14 +484,14 @@ prop1 s@record { datum = (tok , (pkh , v) ∷ map')
       st = record
             { datum = tok ,
             ((pkh , emptyValue) ∷ map')
-            ; value = addValue (sumVal map') minValue
+            ; value = iVal map' tok --addValue (sumVal map') minValue
             ; tsig = pkh
             ; spends = spends
             ; token = token }
             
       st' = record
              { datum = tok , map'
-             ; value = addValue (sumVal map') minValue --sumIVal map'
+             ; value = iVal map' tok --addValue (sumVal map') minValue --sumIVal map'
              ; tsig = pkh
              ; spends = spends
              ; token = token }
@@ -554,14 +513,14 @@ liquidity : ∀ (s : State) (par : MParams)
 
 
 liquidity s@record { datum = (tok , map) ; spends = spends
-  ; token = token } par (p1 , p2) 
+  ; token = token } par (p1 , p2) rewrite iVal≡ s
   = ⟨ (makeIs map ++ [ Stop ]) ,
     (fin (prop1 s s' refl refl refl refl p2 refl refl p1)
     (TStop refl) ) ⟩ 
   where
   s' = record
        { datum = tok , []
-       ; value = minValue
+       ; value = minValue + assetClassValue tok 1
        ; tsig = lastSig map (tsig s)
        ; spends = spends
        ; token = token }
@@ -570,17 +529,17 @@ minValLiquidity : ∀ (s : State) (par : MParams)
           -> invariant s
           -> ∃[ s' ] ∃[ is ]
              ((par ⊢ s ~[ is ]~* s')
-             × (value s' ≡ minValue))
+             × (value s' ≡ (minValue + assetClassValue (s' .datum .fst) 1)))
 
 minValLiquidity s@record { datum = (tok , map) ; spends = spends
-  ; token = token } par (p1 , p2) 
+  ; token = token } par (p1 , p2) rewrite iVal≡ s
   = ⟨ s' , ⟨ (makeIs map) ,
     ((prop1 s s' refl refl refl refl p2 refl refl p1) , refl) ⟩ ⟩
     
   where
   s' = record
        { datum = tok , []
-       ; value = minValue
+       ; value = minValue + assetClassValue tok 1
        ; tsig = lastSig map (tsig s)
        ; spends = spends
        ; token = token }
@@ -640,7 +599,7 @@ targetStateRewrite par s s' i (TTransfer x x₁ x₂ x₃ x₄ x₅ x₆ x₇ x�
 
 rwDatum : ∀ {tok : AssetClass} (pkh : PubKeyHash) (v : Value) (map : AccMap)
   -> (tok , insert pkh emptyValue map) ≡
-     (tok , insert pkh (addValue v (negValue v)) map)
+     (tok , insert pkh (v - v) map)
 rwDatum pkh v map rewrite v-v v = refl
 
 
@@ -666,7 +625,7 @@ userCanRecoverFunds {val} s@record { datum = (tok , map) ; value = v}
   where
   s' = record
         { datum = tok , (insert pkh emptyValue map)
-        ; value = subValue v val
+        ; value = v - val
         ; tsig = pkh
         ; spends = 0
         ; token = 0 , 0
@@ -757,10 +716,10 @@ getS' ctx = record
 
 
 -- Getting the Model parameters from the parameters of the validator and minting policy
-getPar : Address -> TxOutRef -> TokenName -> MParams
-getPar adr oref tn = record
-                     { validatorAddress = adr
-                     ; uniqueId = oref
+getPar : TxOutRef -> TokenName -> MParams
+getPar oref tn = record
+                     { --validatorAddress = adr
+                      uniqueId = oref
                      ; threadTokName = tn
                      }
 
@@ -815,18 +774,18 @@ totalF arg with Classifier arg
 -- The State Transition System as a relation
 totalR : Argument -> Set
 totalR arg with Classifier arg
-... | Initial = getPar (arg .adr) (arg .oref) (arg .tn) ⊢ getMintS (arg .tn) (arg .ctx)
+... | Initial = getPar (arg .oref) (arg .tn) ⊢ getMintS (arg .tn) (arg .ctx)
                 × continuing (arg .ctx) ≡ true
                 × getMintedAmount (arg .ctx) ≡ 1
                 × checkTokenOutAddr (arg .adr) (ownAssetClass (arg .tn) (arg .ctx)) (arg .ctx) ≡ true
 
-... | Running = getPar (arg .adr) (arg .oref) (arg .tn)
+... | Running = getPar (arg .oref) (arg .tn)
                 ⊢ getS (arg .dat) (arg .ctx) ~[ (arg .red) ]~> getS' (arg .ctx)
                 × continuing (arg .ctx) ≡ true
                 × checkTokenIn (arg .dat .fst) (arg .ctx) ≡ true
                 × checkTokenOut (arg .dat .fst) (arg .ctx) ≡ true
                 
-... | Final = getPar (arg .adr) (arg .oref) (arg .tn)
+... | Final = getPar(arg .oref) (arg .tn)
                  ⊢ getS (arg .dat) (arg .ctx)  ~[ (arg .red) ]~>
                  × continuing (arg .ctx) ≡ false
                  × getMintedAmount (arg .ctx) ≡ -1
@@ -853,18 +812,19 @@ map=map (x ∷ l) rewrite n=n (fst x) | v=v (snd x) = map=map l
 
 checkWithdraw' : AssetClass -> Maybe Value -> PubKeyHash -> Value -> AccMap -> Datum -> Bool
 checkWithdraw' tok Nothing _ _ _ _ = false
-checkWithdraw' tok (Just v) pkh val map (tok' , map') = geq val emptyValue && geq v val && ((tok' , map') == (tok , insert pkh (subValue v val) map))
+checkWithdraw' tok (Just v) pkh val map (tok' , map') = geq val emptyValue && geq v val && ((tok' , map') == (tok , insert pkh (v - val) map))
 
 checkDeposit' : AssetClass -> Maybe Value -> PubKeyHash -> Value -> AccMap -> Datum -> Bool
 checkDeposit' tok Nothing _ _ _ _ = false
-checkDeposit' tok (Just v) pkh val map (tok' , map') = geq val emptyValue && ((tok' , map') == (tok , insert pkh (addValue v val) map))
+checkDeposit' tok (Just v) pkh val map (tok' , map') = geq val emptyValue && ((tok' , map') == (tok , insert pkh (v + val) map))
 
 checkTransfer' : AssetClass -> Maybe Value -> Maybe Value -> PubKeyHash -> PubKeyHash -> Value -> AccMap -> Datum -> Bool
 checkTransfer' tok Nothing _ _ _ _ _ _ = false
 checkTransfer' tok (Just vF) Nothing _ _ _ _ _ = false
 checkTransfer' tok (Just vF) (Just vT) from to val map (tok' , map') = geq val emptyValue && geq vF val && from /= to &&
-                         (tok' , map') == (tok , insert from (subValue vF val) (insert to (addValue vT val) map))
+                         (tok' , map') == (tok , insert from (vF - val) (insert to (vT + val) map))
 
+--?
 
 -- Performing a transition implies that the validator returns true
 transitionImpliesValidator : ∀ {par} (d : Datum) (i : Redeemer) (ctx : ScriptContext)
@@ -875,21 +835,21 @@ transitionImpliesValidator : ∀ {par} (d : Datum) (i : Redeemer) (ctx : ScriptC
                            -> agdaValidator d i ctx ≡ true
 transitionImpliesValidator (tok , map) (Open pkh) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = mint ; tokCurrSymbol = cs } ((TOpen refl refl p3 refl refl) , refl , refl , refl) rewrite p3 | n=n pkh | map=map (insert pkh emptyValue map) | v=v inputVal | t=t tok = refl
 transitionImpliesValidator (tok , map) (Close pkh) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = mint ; tokCurrSymbol = cs } ((TClose refl refl p3 refl refl) , refl , refl , refl) rewrite p3 | n=n pkh | map=map (delete pkh map) | v=v inputVal | t=t tok = refl
-transitionImpliesValidator (tok , map) (Withdraw pkh val) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = mint ; tokCurrSymbol = cs } ((TWithdraw {v = v} refl refl p3 p4 p5 refl refl) , refl , refl , refl) rewrite p3 | n=n pkh | v=v (addValue inputVal (negValue val)) | map=map (insert pkh (subValue v val) map) | p4 | p5 | t=t tok = refl
-transitionImpliesValidator (tok , map) (Deposit pkh val) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = mint ; tokCurrSymbol = cs } ((TDeposit {v = v} refl refl p3 p4 refl refl) , refl , refl , refl) rewrite p3 | n=n pkh | v=v (addValue inputVal val) | map=map (insert pkh (addValue v val) map) | p4 | t=t tok = refl
-transitionImpliesValidator (tok , map) (Transfer from to val) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = mint ; tokCurrSymbol = cs } ((TTransfer {vF = vF} {vT = vT} refl refl p3 p4 p5 p6 p7 refl refl) , refl , refl , refl) rewrite p3 | p4 | ≢to/= from to p7 | n=n from | v=v inputVal | map=map (insert from (subValue vF val) (insert to (addValue vT val) map)) | p5 | p6 | t=t tok = refl
+transitionImpliesValidator (tok , map) (Withdraw pkh val) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = mint ; tokCurrSymbol = cs } ((TWithdraw {v = v} refl refl p3 p4 p5 refl refl) , refl , refl , refl) rewrite p3 | n=n pkh | v=v (inputVal - val) | map=map (insert pkh (v - val) map) | p4 | p5 | t=t tok = refl
+transitionImpliesValidator (tok , map) (Deposit pkh val) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = mint ; tokCurrSymbol = cs } ((TDeposit {v = v} refl refl p3 p4 refl refl) , refl , refl , refl) rewrite p3 | n=n pkh | v=v (inputVal + val) | map=map (insert pkh (v + val) map) | p4 | t=t tok = refl
+transitionImpliesValidator (tok , map) (Transfer from to val) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = mint ; tokCurrSymbol = cs } ((TTransfer {vF = vF} {vT = vT} refl refl p3 p4 p5 p6 p7 refl refl) , refl , refl , refl) rewrite p3 | p4 | ≢to/= from to p7 | n=n from | v=v inputVal | map=map (insert from (vF - val) (insert to (vT + val) map)) | p5 | p6 | t=t tok = refl
 
 
 
 -- Being in the initial model state implies we can mint a token
 initialImpliesMinting : ∀ (adr : Address) (oref : TxOutRef) (tn : TokenName) (top : ⊤) (ctx : ScriptContext)
-                           -> (getPar adr oref tn ⊢ getMintS tn ctx
+                           -> (getPar oref tn ⊢ getMintS tn ctx
                                × continuing ctx ≡ true
                                × getMintedAmount ctx ≡ 1
                                × checkTokenOut (newDatum ctx .fst) ctx ≡ true)
                            -> agdaPolicy adr oref tn top ctx ≡ true
-initialImpliesMinting adr oref tn top record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok , l) ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; tokCurrSymbol = cs } ((TStart refl refl refl refl refl) , refl , refl , refl) rewrite n=n oref | t=t tok = refl 
-
+initialImpliesMinting adr oref tn top record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok , l) ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; tokCurrSymbol = cs } ((TStart refl refl refl p) , refl , refl , refl)
+  rewrite sym p | v=v outputVal | n=n oref | t=t tok = refl 
 
 -- Getting to the terminal state implies that the validator returns true and a token can be burned
 stopImpliesBoth : ∀ {tn par i} (d : Datum) (adr : Address) (oref : TxOutRef) (ctx : ScriptContext)   
@@ -943,14 +903,14 @@ validatorImpliesTransition (tok , map) (Withdraw pkh val) ctx iv pf | Just v wit
 validatorImpliesTransition (tok , map) (Withdraw pkh val) ctx iv pf | Just v | tok' , map'
   rewrite sym (==tto≡ tok' tok (get (go (geq v val) (go (geq val emptyValue) (get (go (sig ctx == pkh)
              (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))))))
-             | (==Lto≡ map' (insert pkh (subValue v val) map)
+             | (==Lto≡ map' (insert pkh (v - val) map)
              (go (tok' == tok) (go (geq v val) (go (geq val emptyValue) (get (go (sig ctx == pkh)
              (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))))))
             = (TWithdraw refl (==to≡ (sig ctx) pkh (get (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))
             eq (get (get (go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))
             (get (go (geq val emptyValue) (get (go (sig ctx == pkh) (go (continuing ctx)
             (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))) eq2 
-            ((==vto≡ (newValue ctx) (addValue (oldValue ctx) (negValue val)) (go (checkWithdraw' tok (Just v) pkh val map (tok' , map'))
+            ((==vto≡ (newValue ctx) ((oldValue ctx) - val) (go (checkWithdraw' tok (Just v) pkh val map (tok' , map'))
              ((go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))) ) , (get (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))) , (get pf) , (get (go (checkTokenIn tok ctx) pf))) 
 
 validatorImpliesTransition (tok , map) (Deposit pkh val) ctx iv pf with lookup pkh map in eq
@@ -958,12 +918,12 @@ validatorImpliesTransition (tok , map) (Deposit pkh val) ctx iv pf | Nothing = �
 validatorImpliesTransition (tok , map) (Deposit pkh val) ctx iv pf | Just v with newDatum ctx in eq2
 validatorImpliesTransition (tok , map) (Deposit pkh val) ctx iv pf | Just v | tok' , map'
   rewrite sym (==tto≡ tok' tok (get (go (geq val emptyValue) (get (go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))))
-             | ==Lto≡ map' (insert pkh (addValue v val) map)
+             | ==Lto≡ map' (insert pkh (v + val) map)
              (go (tok' == tok) (go (geq val emptyValue)  (get (go (sig ctx == pkh)
              (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))))
              = (TDeposit refl (==to≡ (sig ctx) pkh (get (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))
              eq (get (get (go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))
-             eq2 (==vto≡ (newValue ctx) (addValue (oldValue ctx) val) (go (checkDeposit' tok (Just v) pkh val map (tok' , map'))
+             eq2 (==vto≡ (newValue ctx) ((oldValue ctx) + val) (go (checkDeposit' tok (Just v) pkh val map (tok' , map'))
              ((go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))) , (get (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))) , (get pf) , (get (go (checkTokenIn tok ctx) pf))) 
 
 validatorImpliesTransition (tok , map) (Transfer from to val) ctx iv pf with lookup from map in eq1
@@ -976,7 +936,7 @@ validatorImpliesTransition (tok , map) (Transfer from to val) ctx iv pf | Just v
 validatorImpliesTransition (tok , map) (Transfer from to val) ctx iv pf | Just vF | Just vT | tok' , map'
   rewrite sym (==tto≡ tok' tok (get (go (from /= to) (go (geq vF val) (go (geq val emptyValue) (get (go (sig ctx == from)
   (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))))))
-  | ==Lto≡ map' (insert from (subValue vF val) (insert to (addValue vT val) map))
+  | ==Lto≡ map' (insert from (vF - val) (insert to (vT + val) map))
   (go (tok' == tok) (go (from /= to) (go (geq vF val) (go (geq val emptyValue) (get (go (sig ctx == from)
   (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))))))
     = (TTransfer refl (==to≡ (sig ctx) from (get (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))) eq1 eq2
@@ -993,17 +953,17 @@ validatorImpliesTransition (tok , map) Stop ctx iv pf = ⊥-elim (iv refl)
 mintingImpliesInitial : ∀ (adr : Address) (oref : TxOutRef) (tn : TokenName) (top : ⊤) (ctx : ScriptContext)
                            -> getMintedAmount ctx ≡ 1
                            -> (pf : agdaPolicy adr oref tn top ctx ≡ true)
-                           -> (getPar adr oref tn ⊢ getMintS tn ctx
+                           -> (getPar oref tn ⊢ getMintS tn ctx
                               × continuing ctx ≡ true
                               × getMintedAmount ctx ≡ 1
                               × checkTokenOut (newDatum ctx .fst) ctx ≡ true)
 mintingImpliesInitial adr oref tn top ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok , l) ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut =  hasTokenOut ; mint = + 1 ; tokCurrSymbol = cs } refl pf
-  rewrite  ==Lto≡ l [] (go ((cs , tn) == tok) (get (go (inputRef == oref) (go continues pf))))
-  = (TStart refl (==to≡ inputRef oref (get (go continues pf)))
-    (==tto≡ (cs , tn) tok (get (get (go (inputRef == oref) (go continues pf))))) refl
-    (==vto≡ outputVal minValue (go hasTokenOut (go (checkDatum adr tn ctx) (go (inputRef == oref) (go continues pf)))))
+  rewrite ==Lto≡ l [] (go ((cs , tn) == tok) (get (go (inputRef == oref) (go continues pf))))
+  | sym (==tto≡ (cs , tn) tok (get (get (go (inputRef == oref) (go continues pf)))))
+  = (TStart refl (==to≡ inputRef oref (get (go continues pf))) refl
+    (==vto≡ outputVal (minValue + assetClassValue (cs , tn) 1) (go hasTokenOut (go (checkDatum adr tn ctx) (go (inputRef == oref) (go continues pf))))) 
     , get pf , refl , (get (go (checkDatum adr tn ctx) (go (inputRef == oref) (go continues pf)))) )
-  
+
 
 -- Validator returning true and burning a token implies we are in the terminal state 
 bothImplyStop : ∀ {tn par} (d : Datum) (adr : Address) (oref : TxOutRef) (i : Redeemer) (ctx : ScriptContext) 
