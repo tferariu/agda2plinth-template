@@ -1,3 +1,4 @@
+\begin{code}[hide]
 open import Validators.AccountSim6
 open import Lib
 open import Value hiding (addValue; subValue)
@@ -1028,3 +1029,4 @@ totalEquiv = record { to = λ { { arg@record { adr = adr ; oref = oref ; dat = d
 
 
 
+\end{code}

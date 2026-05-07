@@ -90,10 +90,10 @@ checkPayment : PubKeyHash -> Value -> ScriptContext -> Bool
 checkPayment pkh v ctx = getPayment pkh ctx == v
 
 before : POSIXTime -> Interval -> Bool
-before record { getPOSIXTime = time } (start , end) = time < start
+before record { getPOSIXTime = time } (start , end) = time < (getPOSIXTime start)
 
 after : POSIXTime -> Interval -> Bool
-after record { getPOSIXTime = time } (start , end) = time > end
+after record { getPOSIXTime = time } (start , end) = time > (getPOSIXTime end)
 
 validRange : ScriptContext -> Interval
 validRange ctx = ScriptContext.validInterval ctx
@@ -104,7 +104,7 @@ data Redeemer : Set where
   Add     : PubKeyHash -> Redeemer
   Pay     : Redeemer
   Cancel  : Redeemer
-  Stop   : Redeemer
+  Stop    : Redeemer
 
 {-# COMPILE AGDA2HS Redeemer #-}
 

@@ -24,7 +24,7 @@ open import Haskell.Prim using (lengthNat)
 open import Haskell.Prelude using (lookup)
 open import Function.Base using (_∋_)
 
-open import Lib
+open import Lib 
 
 module ProofLib where
 
@@ -406,6 +406,7 @@ ltIntegerLemma +[1+ n ] rewrite addNatComm n 1 = ltNatLemma n
 ltIntegerLemma (negsuc zero) = refl
 ltIntegerLemma (negsuc (N.suc n)) = ltNatLemma n
 
+
 lengthNatToLength : ∀ (n : Nat) (l : List Nat) -> (n N.<ᵇ lengthNat l || lengthNat l N.≡ᵇ n) ≡ true -> n N.≤ length l
 lengthNatToLength zero [] pf = N.z≤n
 lengthNatToLength zero (x ∷ l) pf = N.z≤n
@@ -416,3 +417,4 @@ lengthToLengthNat zero [] N.z≤n = refl
 lengthToLengthNat zero (x ∷ l) N.z≤n = refl
 lengthToLengthNat (N.suc n) [] ()
 lengthToLengthNat (N.suc n) (x ∷ l) (N.s≤s p) = lengthToLengthNat n l p
+

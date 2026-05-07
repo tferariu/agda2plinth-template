@@ -1,16 +1,26 @@
-open import Haskell.Prelude hiding (length)
+\begin{code}[hide]
 
-module Lib where
-  
+open import Haskell.Prelude
+
+module Lib' where
+
 --Defining types that already exist in Plinth or are necessary for the abstract implementation of Value
+\end{code}
 
+\newcommand\libDef{%
+\begin{code}
+CurrencySymbol = Nat
+TokenName = Nat
 PubKeyHash = Nat 
 Address = Nat
 TxOutRef = Nat
-CurrencySymbol = Nat
-TokenName = Nat
 AssetClass = (TokenName × CurrencySymbol)
+\end{code}
+}
 
+
+\newcommand\libPOSIX{%
+\begin{code}
 record POSIXTime : Set where
     no-eta-equality
     pattern
@@ -22,17 +32,28 @@ toPOSIXTime : Integer -> POSIXTime
 toPOSIXTime t = record { getPOSIXTime = t }
 
 Interval = (POSIXTime × POSIXTime)
+\end{code}
+}
 
+
+\newcommand\libAda{%
+\begin{code}
 ada : AssetClass
 ada = (0 , 0)
+\end{code}
+}
 
+
+\newcommand\libMap{%
+\begin{code}
 data Map (a b : Set) : Set where
  MkMap : List (a × b) -> Map a b
+\end{code}
+}
 
-length' : List PubKeyHash -> Integer
-length' [] = 0
-length' (x ∷ l) = 1 + length' l
 
+\newcommand\libRational{%
+\begin{code}
 record Rational : Set where
     field
         num    : Integer
@@ -51,9 +72,14 @@ eqRational b c = (numerator b == numerator c) &&
 
 ltRational : Rational -> Rational -> Bool
 ltRational b c = numerator b * denominator c < numerator c * denominator b
+\end{code}
+}
+
+\newcommand\libInstance{%
+\begin{code}
 
 instance
   iEqRational : Eq Rational
   iEqRational ._==_ = eqRational
-
-
+\end{code}
+}

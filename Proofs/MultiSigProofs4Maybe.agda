@@ -1,4 +1,4 @@
-open import Validators.MultiSig3
+open import Validators.MultiSig4Maybe
 open import Lib
 open import Value
 
@@ -31,7 +31,7 @@ open import Haskell.Prelude using (lookup; _-_; _+_)
 
 open import ProofLib
 
-module Proofs.MultiSigProofs3 where
+module Proofs.MultiSigProofs4Maybe where
 
 -- Model and proofs for the Multi-Signature contract
 
@@ -66,7 +66,7 @@ record MParams : Set where
         uniqueId         : TxOutRef
         threadTokName    : TokenName
         authSigs         : List PubKeyHash
-        minSigs          : Nat
+        minSigs          : Integer
         maxWait          : Integer
 open MParams public
 
@@ -81,7 +81,7 @@ data _⊢_ : MParams -> State -> Set where
     -> uniqueId par ≡ spends s
     -> token s .snd ≡ threadTokName par
     -> noDups (authSigs par) ≡ true
-    -> (lengthNat (authSigs par) >= (minSigs par)) ≡ true
+    -> (length' (authSigs par) >= (minSigs par)) ≡ true
     -> (maxWait par > 0) ≡ true 
     -------------------
     -> par ⊢ s
@@ -109,7 +109,7 @@ data _⊢_~[_]~>_ : MParams -> State -> Redeemer -> State -> Set where
     -> par ⊢ s ~[ (Add sig) ]~> s'
 
   TPay : ∀ {v pkh tok d sigs s s' par} 
-    -> length sigs N.≥ minSigs par
+    -> (length' sigs >= (minSigs par)) ≡ true --length sigs N.≥ minSigs par
     -> datum s ≡ (tok , Collecting v pkh d sigs)
     -> datum s' ≡ (tok , Holding)
     -> value s' + v ≡ value s
@@ -174,7 +174,7 @@ data _⊢_~[_]~>* : MParams -> State -> List Redeemer -> Set where
 
 --Valid Parameters
 validP : MParams -> Set 
-validP par = Unique (authSigs par) × length (authSigs par) N.≥ minSigs par × (ltInteger (pos 0) (maxWait par) ≡ true)
+validP par = Unique (authSigs par) × (((length' (authSigs par)) >= (minSigs par)) ≡ true) × (ltInteger (pos 0) (maxWait par) ≡ true)
 
 --State Validity sub-lemmas
 diffLabels : ∀ {v pkh d sigs tok1 tok2} (dat : Datum) -> dat ≡ (tok1 , Holding)
@@ -232,7 +232,9 @@ validParamsInitial : ∀ {s par}
   -> par ⊢ s
   -> validP par
 validParamsInitial {par = par} (TStart p1 p' p2 p3 p4 p5 p6)
-  = noDups->Unique (authSigs par) p4 , lengthNatToLength (minSigs par) (par .authSigs) p5 , p6
+  = noDups->Unique (authSigs par) p4 , p5 , p6
+
+--lengthNatToLength (minSigs par) (par .authSigs) p5
 
 validStateTransition : ∀ {s s' : State} {i par}
   -> validS s
@@ -392,7 +394,17 @@ insertList-lem (x ∷ l1) l2 = insertList-sublem l1 (insert x l2) x (insert-lem1
 --Unique Insert Lemma
 uil : ∀ (l1 l2 : List PubKeyHash) (pf : Unique l1) -> (length (insertList l1 l2) N.≥ length l1)
 uil l1 l2 pf = unique-lem (insertList-lem l1 l2) pf
-  
+
+
+unique-lem' : {l1 l2 : List a} -> l1 ⊆ l2 -> Unique l1 -> (length l2 >= length l1) ≡ true
+unique-lem' {l2 = []} [] root = refl
+unique-lem' {l2 = x ∷ l2} [] root = refl
+unique-lem' {l2 = x₁ ∷ l2} (px ∷ sub) (x :: un) = {!!}
+--rewrite sym (length-del px) = N.s≤s (unique-lem (subset-del px x sub) un)
+
+uil' : ∀ (l1 l2 : List PubKeyHash) (pf : Unique l1) -> ((length' (insertList l1 l2) >= length' l1) ≡ true)
+uil' l1 l2 pf = {!!} --unique-lem (insertList-lem l1 l2) pf
+
 --Multi-Step lemma
 lemmaMultiStep : ∀ (par : MParams) (s s' s'' : State) (is is' : List Redeemer)
                    -> par ⊢ s  ~[ is  ]~* s'
@@ -430,7 +442,7 @@ prop2 {d = d} {sigs = sigs} {tok = tok}
   s2@record { datum = .(tok , Holding) ; value = value ; outVal = outVal ; tsig = sig ; spends = spn ; token = tok' } par (Col p1 p2 p3 p4) refl refl refl refl (p5 , p6 , p') refl
   = lemmaMultiStep par s1 s' s2 (makeIs (authSigs par)) [ Pay ]
     (prop1 s1 s' par refl refl refl refl refl refl refl refl)
-    (cons (TPay (N.≤-trans p6 (uil (authSigs par) sigs p5)) refl refl refl refl) nil)
+    (cons (TPay {!geqIntegerTrans!} refl refl refl refl) nil) --(N.≤-trans p6 (uil (authSigs par) sigs p5))
   where
     s' = record
           { datum = tok , (Collecting outVal sig d (insertList (authSigs par) sigs)) 
@@ -764,13 +776,13 @@ validatorImpliesTransition par (tok , Collecting v pkh d sigs) (Add sig) ctx@rec
 
 validatorImpliesTransition par (tok , Collecting v pkh d sigs) Pay ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , Holding) ; signature = signature ; continues = continues ; tokenIn = true ; tokenOut = tokenOut } n pf rewrite 
   ==tto≡ tok tok' (go ((outputVal + v) == inputVal) (go (checkPayment pkh v ctx)
-  (go tokenOut (go continues (go ((lengthNat sigs) >= (minSigs par)) pf)))))
-  = (TPay (lengthNatToLength (minSigs par) sigs (get pf)) refl refl
+  (go tokenOut (go continues (go ((length' sigs) >= (minSigs par)) pf)))))
+  = (TPay {!!} {!!} {!!} --(lengthNatToLength (minSigs par) sigs (get pf)) refl refl
   (==vto≡ (outputVal + v) inputVal (get (go (checkPayment pkh v ctx)
-  (go tokenOut (go continues (go ((lengthNat sigs) >= (minSigs par)) pf))))))
-  (==vto≡ (getPayment pkh ctx) v (get (go tokenOut (go continues (go ((lengthNat sigs) >= (minSigs par)) pf)))))) ,
-  get (go ((lengthNat sigs) >= (minSigs par)) pf) , refl , get (go continues (go ((lengthNat sigs) >= (minSigs par)) pf))
-validatorImpliesTransition par (tok , Collecting v pkh d sigs) Pay record { outputDatum = (tok' , Collecting v' pkh' d' sigs') ; continues = continues ; tokenIn = true ; tokenOut = tokenOut } n pf = ⊥-elim (&&3false ((lengthNat sigs) >= (par .minSigs)) continues tokenOut pf)
+  (go tokenOut (go continues (go ((length' sigs) >= (minSigs par)) pf))))))
+  (==vto≡ (getPayment pkh ctx) v (get (go tokenOut (go continues (go ((length' sigs) >= (minSigs par)) pf)))))) ,
+  get (go ((length' sigs) >= (minSigs par)) pf) , refl , get (go continues (go ((length' sigs) >= (minSigs par)) pf))
+validatorImpliesTransition par (tok , Collecting v pkh d sigs) Pay record { outputDatum = (tok' , Collecting v' pkh' d' sigs') ; continues = continues ; tokenIn = true ; tokenOut = tokenOut } n pf = ⊥-elim (&&3false ((length' sigs) >= (par .minSigs)) continues tokenOut pf)
 
 validatorImpliesTransition par (tok , Collecting v pkh d sigs) Cancel ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , Holding) ; payments = payments ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = mint ; tokCurrSymbol = tokCurrSymbol ; tokenIn = true ; tokenOut = tokenOut ; validInterval = validInterval } n pf rewrite ==tto≡ tok tok' (go (expired d ctx) (go tokenOut (go continues (go (outputVal == inputVal) pf))))
   = TCancel (get (go tokenOut (go continues (go (outputVal == inputVal) pf)))) refl refl (==vto≡ outputVal inputVal (get pf)) ,
@@ -793,7 +805,7 @@ mintingImpliesStart {par} adr oref tn ctx@record { inputVal = inputVal ; outputV
     (go (checkDatum adr tn ctx) (go (consumes oref ctx) (go continues pf)))))
     (get (go (noDups (par .authSigs)) (go (checkValue adr tn ctx) (go (checkDatum adr tn ctx)
     (go (consumes oref ctx) (go continues pf))))))
-    (go (lengthNat (par .authSigs) >= (par .minSigs)) (go (noDups (par .authSigs))
+    (go (length' (par .authSigs) >= (par .minSigs)) (go (noDups (par .authSigs))
     (go (checkValue adr tn ctx) (go (checkDatum adr tn ctx) (go (consumes oref ctx) (go continues pf)))))) , (get pf , refl) ,
     go (geq outputVal x2MinValue ) (get (go ((cs , tn) == tok) (go (oref == inputRef) (go continues pf)))) 
 
@@ -817,7 +829,7 @@ bothImplyStop par dat@(tok , Holding) adr oref tn Stop ctx@record { tokenIn = to
 bothImplyStop par (tok , Collecting pkh v d sigs) adr oref tn (Propose v' pkh' d') ctx refl p2 = ⊥-elim (&&false (checkTokenIn tok ctx) (get p2))
 bothImplyStop par (tok , Collecting pkh v d sigs) adr oref tn (Add sig) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = false ; tokenIn = tokenIn } refl p2 = ⊥-elim (get⊥ (sym (go (query sig (par .authSigs)) (go (sig == signature) (go (outputVal == inputVal) (go tokenIn (get p2)))))))
 bothImplyStop par dat@(tok , Collecting pkh v d sigs) adr oref tn i@(Add sig) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator par dat i ctx) p2)))
-bothImplyStop par (tok , Collecting pkh v d sigs) adr oref tn Pay record { continues = false ; tokenIn = tokenIn } refl p2 = ⊥-elim (get⊥ (sym (go ((lengthNat sigs) >= (minSigs par)) (go tokenIn (get p2)))))
+bothImplyStop par (tok , Collecting pkh v d sigs) adr oref tn Pay record { continues = false ; tokenIn = tokenIn } refl p2 = ⊥-elim (get⊥ (sym (go ((length' sigs) >= (minSigs par)) (go tokenIn (get p2)))))
 bothImplyStop par dat@(tok , Collecting pkh v d sigs) adr oref tn Pay ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator par dat Pay ctx) p2)))
 bothImplyStop par (tok , Collecting pkh v d sigs) adr oref tn Cancel record { inputVal = inputVal ; outputVal = outputVal ; continues = false ; tokenIn = tokenIn } refl p2 = ⊥-elim (get⊥ (sym (go (outputVal == inputVal) (go tokenIn (get p2)))))
 bothImplyStop par dat@(tok , Collecting pkh v d sigs) adr oref tn Cancel ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator par dat Cancel ctx) p2)))
@@ -843,7 +855,7 @@ transitionImpliesValidator par (tok , Collecting v pkh d sigs) i record { inputV
   rewrite v=v inputVal | v=v v | n=n pkh | i=i d | t=t tok | l=l (insert sig sigs) | n=n sig | ∈toQuery p1 = refl
 transitionImpliesValidator par (tok , Collecting v pkh d sigs) i record { inputVal = inputVal ; outputVal = outputVal }
   (TPay p1 refl refl refl refl , refl , refl , refl)
-  rewrite v=v v | v=v (outputVal + v) | t=t tok | lengthToLengthNat (minSigs par) sigs p1 = refl
+  rewrite v=v v | v=v (outputVal + v) | t=t tok = {!!} --| lengthToLengthNat (minSigs par) sigs p1 = refl
 transitionImpliesValidator par (tok , Collecting v pkh d sigs) i record { inputVal = inputVal }
   (TCancel p1 refl refl refl , refl , refl , refl)
   rewrite v=v inputVal | t=t tok | p1 = refl

@@ -1,18 +1,25 @@
+\begin{code}[hide]
+
 open import Haskell.Prelude hiding (lookup)
 open import Lib
 open import Value
 
-module Validators.AccountSim6 where
+module Validators.AccountSim6' where
 
 -- Defining the types of our Plinth Datum, referred to as Label in Agda
+\end{code}
+
+\newcommand\accDat{%
+\begin{code}
 AccMap = List (PubKeyHash × Value)
-
 Datum = (AssetClass × AccMap)
+\end{code}
+}
 
-{-# COMPILE AGDA2HS AccMap #-}
-{-# COMPILE AGDA2HS Datum #-}
 
 -- The abstract ScriptContext
+\newcommand\accSC{%
+\begin{code}
 record ScriptContext : Set where
     field     
         inputVal      : Value
@@ -27,7 +34,13 @@ record ScriptContext : Set where
         tokenIn       : Bool
         tokenOut      : Bool
         validInterval : Interval
+\end{code}
+}
 
+\begin{code}[hide]
+
+{-# COMPILE AGDA2HS AccMap #-}
+{-# COMPILE AGDA2HS Datum #-}
 -- Functions equivalent to Plinth ScriptContext functions or provided by our template
 --https://plutus.cardano.intersectmbo.org/haddock/latest/plutus-ledger-api/PlutusLedgerApi-V3-Data-Contexts.html#t:ScriptContext
 
@@ -96,6 +109,10 @@ validRange : ScriptContext -> Interval
 validRange ctx = ScriptContext.validInterval ctx
 
 -- The type of the Plinth Redeemer, referred to as Input in Agda
+\end{code}
+
+\newcommand\accRed{%
+\begin{code}
 data Redeemer : Set where
   Open     : PubKeyHash -> Redeemer
   Close    : PubKeyHash -> Redeemer
@@ -103,6 +120,10 @@ data Redeemer : Set where
   Deposit  : PubKeyHash -> Value -> Redeemer
   Transfer : PubKeyHash -> PubKeyHash -> Value -> Redeemer
   Stop     : Redeemer
+\end{code}
+}
+
+\begin{code}[hide]
 
 {-# COMPILE AGDA2HS Redeemer #-}
 
@@ -160,26 +181,33 @@ checkTransfer tok (Just vF) (Just vT) from to val map ctx = geq val emptyValue &
 
 -- The Validator
 agdaValidator : Datum -> Redeemer -> ScriptContext -> Bool
-agdaValidator (tok , map) inp ctx = checkTokenIn tok ctx && (case inp of λ where
+agdaValidator (tok , map) red ctx = checkTokenIn tok ctx && (case red of λ where
 
-    (Open pkh) -> checkTokenOut tok ctx && continuing ctx && checkSigned pkh ctx &&
+    (Open pkh) -> checkTokenOut tok ctx && continuing ctx &&
+                  checkSigned pkh ctx &&
                   not (checkMembership (lookup pkh map)) &&
-                  newDatum ctx == (tok , insert pkh emptyValue map) && newValue ctx == oldValue ctx
+                  newDatum ctx == (tok , insert pkh emptyValue map) &&
+                  newValue ctx == oldValue ctx
 
-    (Close pkh) -> checkTokenOut tok ctx && continuing ctx && checkSigned pkh ctx && checkEmpty (lookup pkh map) &&
-                   newDatum ctx == (tok , delete pkh map) && newValue ctx == oldValue ctx
+    (Close pkh) -> checkTokenOut tok ctx && continuing ctx &&
+                   checkSigned pkh ctx && checkEmpty (lookup pkh map) &&
+                   newDatum ctx == (tok , delete pkh map) &&
+                   newValue ctx == oldValue ctx
 
-    (Withdraw pkh val) -> checkTokenOut tok ctx && continuing ctx && checkSigned pkh ctx &&
+    (Withdraw pkh val) -> checkTokenOut tok ctx && continuing ctx &&
+                          checkSigned pkh ctx &&
                           checkWithdraw tok (lookup pkh map) pkh val map ctx &&
                           newValue ctx == oldValue ctx - val
 
-    (Deposit pkh val) -> checkTokenOut tok ctx && continuing ctx && checkSigned pkh ctx &&
+    (Deposit pkh val) -> checkTokenOut tok ctx && continuing ctx &&
+                         checkSigned pkh ctx &&
                          checkDeposit tok (lookup pkh map) pkh val map ctx &&
                          newValue ctx == oldValue ctx + val
 
-    (Transfer from to val) -> checkTokenOut tok ctx && continuing ctx && checkSigned from ctx &&
-                              checkTransfer tok (lookup from map) (lookup to map) from to val map ctx &&
-                              newValue ctx == oldValue ctx 
+    (Transfer from to val) ->
+      checkTokenOut tok ctx && continuing ctx && checkSigned from ctx &&
+      checkTransfer tok (lookup from map) (lookup to map) from to val map ctx &&
+      newValue ctx == oldValue ctx 
 
     Stop -> checkTokenBurned tok ctx && not (continuing ctx) && map == [] )
 
@@ -216,3 +244,4 @@ agdaPolicy addr oref tn _ ctx =
 
 {-# COMPILE AGDA2HS agdaPolicy #-}
 
+\end{code}

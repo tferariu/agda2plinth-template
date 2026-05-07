@@ -76,7 +76,7 @@ data _⊢_~[_]~>_ : MParams -> State -> Redeemer -> State -> Set where
     -> value s' ≡ v 
     -> datum s' ≡ ((fst (datum s)) , (record { ratio = r ; owner = owner (snd (datum s)) })) 
     -> checkRational r ≡ true 
-    -> checkMinValue v ≡ true
+    -> geq v minValue ≡ true
     -------------------
     -> par ⊢ s ~[ (Update v r) ]~> s'
 
@@ -84,7 +84,7 @@ data _⊢_~[_]~>_ : MParams -> State -> Redeemer -> State -> Set where
     -> value s' + assetClassValue (sellCurr par) amt ≡ value s 
     -> datum s' ≡ datum s
     -> ratioCompare amt (assetClassValueOf (payVal s') (buyCurr par)) (ratio (snd (datum s))) ≡ true
-    -> checkMinValue (payVal s') ≡ true
+    -> geq (payVal s') minValue ≡ true
     -------------------
     -> par ⊢ s ~[ (Exchange amt pkh) ]~> s'
 
@@ -249,19 +249,19 @@ validatorImpliesTransition : ∀ {oref tn} (par : Params) (d : Datum) (i : Redee
                                × checkTokenOut (d .fst) ctx ≡ true )
 validatorImpliesTransition par d (Update v r) ctx p1 p2
   = TUpdate (==to≡ (owner (snd d)) (sig ctx) (get (go (checkTokenIn (d .fst) ctx) p2)))
-  (==vto≡ (newValue ctx) v (get (go (checkMinValue v) (go (checkRational r)
+  (==vto≡ (newValue ctx) v (get (go (geq v minValue) (go (checkRational r)
   (go (checkSigned (owner (snd d)) ctx) (go (checkTokenIn (d .fst) ctx) p2))))))
-  (==dto≡ (get (go (newValue ctx == v) (go (checkMinValue v) (go (checkRational r)
+  (==dto≡ (get (go (newValue ctx == v) (go (geq v minValue) (go (checkRational r)
   (go (checkSigned (owner (snd d)) ctx) (go (checkTokenIn (d .fst) ctx) p2)))))))
   (get (go (checkSigned (owner (snd d)) ctx) (go (checkTokenIn (d .fst) ctx) p2)))
   (get (go (checkRational r) (go (checkSigned (owner (snd d)) ctx)
   (go (checkTokenIn (d .fst) ctx) p2)))) , get (go
   (newDatum ctx == (d. fst , record {ratio = r ; owner = owner (snd d)}))
-  (go (newValue ctx == v) (go (checkMinValue v) (go (checkRational r)
+  (go (newValue ctx == v) (go (geq v minValue) (go (checkRational r)
   (go (checkSigned (owner (snd d)) ctx) (go (checkTokenIn (d .fst) ctx) p2)))))) ,
   get p2 , go (continuing ctx)
   (go (newDatum ctx == (d. fst , record {ratio = r ; owner = owner (snd d)}))
-  (go (newValue ctx == v) (go (checkMinValue v) (go (checkRational r)
+  (go (newValue ctx == v) (go (geq v minValue) (go (checkRational r)
   (go (checkSigned (owner (snd d)) ctx)
   (go (checkTokenIn (d .fst) ctx) p2))))))
 
@@ -317,7 +317,7 @@ bothImplyStop par d@(tok , lab) adr oref tn i@(Exchange amt pkh) ctx refl p2 wit
 ...| False = ⊥-elim (get⊥ (sym (go (checkPaymentRatio (owner lab) amt (buyCurr par) (ratio lab) ctx) (go (newDatum ctx == (tok , lab)) (go (oldValue ctx == newValue ctx <> (assetClassValue (sellCurr par) amt)) (go (checkTokenIn tok ctx) (get p2)))))))
 bothImplyStop par d adr oref tn Stop ctx refl p2 = TStop (==to≡ (owner (snd d)) (sig ctx) (go (not (continuing ctx)) (go (checkTokenIn (d .fst) ctx) (get p2)))) , unNot (go (agdaValidator par d Stop ctx) p2) , refl , get (get p2)
 -}
-bothImplyStop par (tok , lab) adr oref tn (Update v r) ctx@record { continues = false } refl p2 = ⊥-elim (get⊥ (sym (go (newDatum ctx == (tok , record {ratio = r ; owner = owner lab})) (go (newValue ctx == v) (go (checkMinValue v) (go (checkRational r) (go (checkSigned (owner lab) ctx) (go (checkTokenIn tok ctx) (get p2)))))))))
+bothImplyStop par (tok , lab) adr oref tn (Update v r) ctx@record { continues = false } refl p2 = ⊥-elim (get⊥ (sym (go (newDatum ctx == (tok , record {ratio = r ; owner = owner lab})) (go (newValue ctx == v) (go (geq v minValue) (go (checkRational r) (go (checkSigned (owner lab) ctx) (go (checkTokenIn tok ctx) (get p2)))))))))
 bothImplyStop par d adr oref tn i@(Update v r) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator par d i ctx) p2)))
 bothImplyStop par (tok , lab) adr oref tn (Exchange amt pkh) ctx@record { continues = false } refl p2 = ⊥-elim (get⊥ (sym (go (checkPaymentRatio (owner lab) amt (buyCurr par) (ratio lab) ctx) (go (newDatum ctx == (tok , lab)) (go (newValue ctx + (assetClassValue (sellCurr par) amt) == oldValue ctx) (go (checkTokenIn tok ctx) (get p2)))))))
 bothImplyStop par d adr oref tn i@(Exchange amt pkh) ctx@record { continues = true } refl p2 =  ⊥-elim (get⊥ (sym (go (agdaValidator par d i ctx) p2)))
