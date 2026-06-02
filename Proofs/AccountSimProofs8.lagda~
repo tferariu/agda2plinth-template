@@ -1,5 +1,5 @@
 \begin{code}[hide]
-open import Validators.AccountSim6'
+open import Validators.AccountSim8
 open import Lib'
 open import Value'
 
@@ -32,7 +32,7 @@ open _×_×_
 
 open import ProofLib'
 
-module Proofs.AccountSimProofs6' where
+module Proofs.AccountSimProofs8 where
 
 -- Model and proofs for the Account Simulation contract
   
@@ -830,7 +830,7 @@ initialImpliesMinting : ∀ (adr : Address) (oref : TxOutRef) (tn : TokenName) (
                            -> (getPar oref tn ⊢ getMintS tn ctx
                                × continuing ctx ≡ true
                                × getMintedAmount ctx ≡ 1
-                               × checkTokenOut (newDatum ctx .fst) ctx ≡ true)
+                               × checkTokenOut (ownAssetClass tn ctx) ctx ≡ true)
                            -> agdaPolicy adr oref tn top ctx ≡ true
 \end{code}
 }
@@ -869,10 +869,9 @@ mintingImpliesInitial : ∀ (adr : Address) (oref : TxOutRef) (tn : TokenName) (
                            -> (getPar oref tn ⊢ getMintS tn ctx
                               × continuing ctx ≡ true
                               × getMintedAmount ctx ≡ 1
-                              × checkTokenOut (newDatum ctx .fst) ctx ≡ true)
+                              × checkTokenOut (ownAssetClass tn ctx) ctx ≡ true)
 \end{code}
 }
-
 
 
 
@@ -947,20 +946,20 @@ checkTransfer' tok (Just vF) (Just vT) from to val map (tok' , map') = geq val e
 
 -- Performing a transition implies that the validator returns true
 
-transitionImpliesValidator (tok , map) (Open pkh) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = mint ; tokCurrSymbol = cs } ((TOpen refl refl p3 refl refl) , refl , refl , refl) rewrite p3 | n=n pkh | map=map (insert pkh emptyValue map) | v=v inputVal | t=t tok = refl
-transitionImpliesValidator (tok , map) (Close pkh) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = mint ; tokCurrSymbol = cs } ((TClose refl refl p3 refl refl) , refl , refl , refl) rewrite p3 | n=n pkh | map=map (delete pkh map) | v=v inputVal | t=t tok = refl
-transitionImpliesValidator (tok , map) (Withdraw pkh val) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = mint ; tokCurrSymbol = cs } ((TWithdraw {v = v} refl refl p3 p4 p5 refl refl) , refl , refl , refl) rewrite p3 | n=n pkh | v=v (inputVal - val) | map=map (insert pkh (v - val) map) | p4 | p5 | t=t tok = refl
-transitionImpliesValidator (tok , map) (Deposit pkh val) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = mint ; tokCurrSymbol = cs } ((TDeposit {v = v} refl refl p3 p4 refl refl) , refl , refl , refl) rewrite p3 | n=n pkh | v=v (inputVal + val) | map=map (insert pkh (v + val) map) | p4 | t=t tok = refl
-transitionImpliesValidator (tok , map) (Transfer from to val) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = mint ; tokCurrSymbol = cs } ((TTransfer {vF = vF} {vT = vT} refl refl p3 p4 p5 p6 p7 refl refl) , refl , refl , refl) rewrite p3 | p4 | ≢to/= from to p7 | n=n from | v=v inputVal | map=map (insert from (vF - val) (insert to (vT + val) map)) | p5 | p6 | t=t tok = refl
+transitionImpliesValidator (tok , map) (Open pkh) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = mint ; tokCurrSymbol = cs } ((TOpen refl refl p3 refl refl) , refl , p7 , p8) rewrite p3 | n=n pkh | map=map (insert pkh emptyValue map) | v=v inputVal | t=t tok | p7 | p8 = refl
+transitionImpliesValidator (tok , map) (Close pkh) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = mint ; tokCurrSymbol = cs } ((TClose refl refl p3 refl refl) , refl , p7 , p8) rewrite p3 | n=n pkh | map=map (delete pkh map) | v=v inputVal | t=t tok | p7 | p8 = refl
+transitionImpliesValidator (tok , map) (Withdraw pkh val) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = mint ; tokCurrSymbol = cs } ((TWithdraw {v = v} refl refl p3 p4 p5 refl refl) , refl , p9 , p10) rewrite p3 | n=n pkh | v=v (inputVal - val) | map=map (insert pkh (v - val) map) | p4 | p5 | t=t tok | p9 | p10 = refl
+transitionImpliesValidator (tok , map) (Deposit pkh val) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = mint ; tokCurrSymbol = cs } ((TDeposit {v = v} refl refl p3 p4 refl refl) , refl , p8 , p9) rewrite p3 | n=n pkh | v=v (inputVal + val) | map=map (insert pkh (v + val) map) | p4 | t=t tok | p8 | p9 = refl
+transitionImpliesValidator (tok , map) (Transfer from to val) record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , map') ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = mint ; tokCurrSymbol = cs } ((TTransfer {vF = vF} {vT = vT} refl refl p3 p4 p5 p6 p7 refl refl) , refl , p11 , p12) rewrite p3 | p4 | ≢to/= from to p7 | n=n from | v=v inputVal | map=map (insert from (vF - val) (insert to (vT + val) map)) | p5 | p6 | t=t tok | p11 | p12 = refl
 
 
 
 -- Being in the initial model state implies we can mint a token
-initialImpliesMinting adr oref tn top record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok , l) ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; tokCurrSymbol = cs } ((TStart refl refl refl p) , refl , refl , refl)
-  rewrite sym p | v=v outputVal | n=n oref | t=t tok = refl 
+initialImpliesMinting adr oref tn top record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok , l) ; signature = signature ; continues = continues ; inputRef = inputRef ; tokCurrSymbol = cs } ((TStart refl refl refl p4) , refl , refl , p7)
+  rewrite sym p4 | v=v outputVal | n=n oref | t=t tok | p7  = refl 
 
 -- Getting to the terminal state implies that the validator returns true and a token can be burned
-stopImpliesBoth d adr oref ctx ((TStop refl) , refl , refl , refl) = refl
+stopImpliesBoth d adr oref ctx ((TStop refl) , refl , refl , p4) rewrite p4 = refl
 
 
 
@@ -969,7 +968,7 @@ validatorImpliesTransition (tok , map) (Open pkh) ctx iv pf with lookup pkh map 
 validatorImpliesTransition (tok , map) (Open pkh) ctx iv pf | Just _ = ⊥-elim (&&4false (checkTokenIn tok ctx) (checkTokenOut tok ctx) (continuing ctx) (sig ctx == pkh) pf)
 validatorImpliesTransition (tok , map) (Open pkh) ctx iv pf | Nothing with newDatum ctx in eq2
 validatorImpliesTransition (tok , map) (Open pkh) ctx iv pf | Nothing | tok' , map'
-     rewrite sym (==tto≡ tok' tok (get (get (go (sig ctx == pkh) ((go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))))
+     rewrite (==tto≡ tok' tok (get (get (go (sig ctx == pkh) ((go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))))
              | ==Lto≡ map' (insert pkh emptyValue map) (go (tok' == tok) (get (go (sig ctx == pkh) 
              (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))) 
              = (TOpen refl ((==to≡ (sig ctx) pkh (get (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))) )
@@ -994,7 +993,7 @@ validatorImpliesTransition (tok , map) (Withdraw pkh val) ctx iv pf with lookup 
 validatorImpliesTransition (tok , map) (Withdraw pkh val) ctx iv pf | Nothing = ⊥-elim (&&4false (checkTokenIn tok ctx) (checkTokenOut tok ctx) (continuing ctx) (sig ctx == pkh) pf)
 validatorImpliesTransition (tok , map) (Withdraw pkh val) ctx iv pf | Just v with newDatum ctx in eq2
 validatorImpliesTransition (tok , map) (Withdraw pkh val) ctx iv pf | Just v | tok' , map'
-  rewrite sym (==tto≡ tok' tok (get (go (geq v val) (go (geq val emptyValue) (get (go (sig ctx == pkh)
+  rewrite (==tto≡ tok' tok (get (go (geq v val) (go (geq val emptyValue) (get (go (sig ctx == pkh)
              (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))))))
              | (==Lto≡ map' (insert pkh (v - val) map)
              (go (tok' == tok) (go (geq v val) (go (geq val emptyValue) (get (go (sig ctx == pkh)
@@ -1010,7 +1009,7 @@ validatorImpliesTransition (tok , map) (Deposit pkh val) ctx iv pf with lookup p
 validatorImpliesTransition (tok , map) (Deposit pkh val) ctx iv pf | Nothing = ⊥-elim (&&4false (checkTokenIn tok ctx) (checkTokenOut tok ctx) (continuing ctx) (sig ctx == pkh) pf)
 validatorImpliesTransition (tok , map) (Deposit pkh val) ctx iv pf | Just v with newDatum ctx in eq2
 validatorImpliesTransition (tok , map) (Deposit pkh val) ctx iv pf | Just v | tok' , map'
-  rewrite sym (==tto≡ tok' tok (get (go (geq val emptyValue) (get (go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))))
+  rewrite (==tto≡ tok' tok (get (go (geq val emptyValue) (get (go (sig ctx == pkh) (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))))
              | ==Lto≡ map' (insert pkh (v + val) map)
              (go (tok' == tok) (go (geq val emptyValue)  (get (go (sig ctx == pkh)
              (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf)))))))
@@ -1027,7 +1026,7 @@ validatorImpliesTransition (tok , map) (Transfer from to val) ctx iv pf | Just v
   = ⊥-elim (&&4false (checkTokenIn tok ctx) (checkTokenOut tok ctx) (continuing ctx) (sig ctx == from) pf)
 validatorImpliesTransition (tok , map) (Transfer from to val) ctx iv pf | Just vF | Just vT with newDatum ctx in eq3
 validatorImpliesTransition (tok , map) (Transfer from to val) ctx iv pf | Just vF | Just vT | tok' , map'
-  rewrite sym (==tto≡ tok' tok (get (go (from /= to) (go (geq vF val) (go (geq val emptyValue) (get (go (sig ctx == from)
+  rewrite (==tto≡ tok' tok (get (go (from /= to) (go (geq vF val) (go (geq val emptyValue) (get (go (sig ctx == from)
   (go (continuing ctx) (go (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))))))))))
   | ==Lto≡ map' (insert from (vF - val) (insert to (vT + val) map))
   (go (tok' == tok) (go (from /= to) (go (geq vF val) (go (geq val emptyValue) (get (go (sig ctx == from)
@@ -1043,24 +1042,24 @@ validatorImpliesTransition (tok , map) Stop ctx iv pf = ⊥-elim (iv refl)
 
 
 -- Minting the token implies we are in the initial state of our model
-mintingImpliesInitial adr oref tn top ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok , l) ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut =  hasTokenOut ; mint = + 1 ; tokCurrSymbol = cs } refl pf
+mintingImpliesInitial adr oref tn top ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok , l) ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = + 1 ; tokCurrSymbol = cs } refl pf
   rewrite ==Lto≡ l [] (go ((cs , tn) == tok) (get (go (inputRef == oref) (go continues pf))))
   | sym (==tto≡ (cs , tn) tok (get (get (go (inputRef == oref) (go continues pf)))))
   = (TStart refl (==to≡ inputRef oref (get (go continues pf))) refl
-    (==vto≡ outputVal (minValue + assetClassValue (cs , tn) 1) (go hasTokenOut (go (checkDatum adr tn ctx) (go (inputRef == oref) (go continues pf))))) 
+    (==vto≡ outputVal (minValue + assetClassValue (cs , tn) 1) (go (checkTokenOutAddr adr (cs , tn) ctx) (go (checkDatum adr tn ctx) (go (inputRef == oref) (go continues pf))))) 
     , get pf , refl , (get (go (checkDatum adr tn ctx) (go (inputRef == oref) (go continues pf)))) )
 
 
 -- Validator returning true and burning a token implies we are in the terminal state 
-bothImplyStop d adr oref (Open pkh) record { tokenIn = tokenIn ; tokenOut = tokenOut ; continues = false } refl p2 = ⊥-elim (get⊥ (sym (go tokenOut (go tokenIn (get p2)))))
+bothImplyStop d adr oref (Open pkh) ctx@record { continues = false } refl p2 = ⊥-elim (get⊥ (sym (go (checkTokenOut (d .fst) ctx) (go (checkTokenIn (d .fst) ctx) (get p2)))))
 bothImplyStop d adr oref i@(Open pkh) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator d i ctx) p2) ))
-bothImplyStop d adr oref (Close pkh) record { tokenIn = tokenIn ; tokenOut = tokenOut ; continues = false } refl p2 = ⊥-elim (get⊥ (sym (go tokenOut (go tokenIn (get p2)))))
+bothImplyStop d adr oref (Close pkh) ctx@record { continues = false } refl p2 = ⊥-elim (get⊥ (sym (go (checkTokenOut (d .fst) ctx) (go (checkTokenIn (d .fst) ctx) (get p2)))))
 bothImplyStop d adr oref i@(Close pkh) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator d i ctx) p2) ))
-bothImplyStop d adr oref (Withdraw pkh v) record { tokenIn = tokenIn ; tokenOut = tokenOut ; continues = false } refl p2 = ⊥-elim (get⊥ (sym (go tokenOut (go tokenIn (get p2)))))
+bothImplyStop d adr oref (Withdraw pkh v) ctx@record { continues = false } refl p2 = ⊥-elim (get⊥ (sym (go (checkTokenOut (d .fst) ctx) (go (checkTokenIn (d .fst) ctx) (get p2)))))
 bothImplyStop d adr oref i@(Withdraw pkh v) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator d i ctx) p2) ))
-bothImplyStop d adr oref (Deposit pkh v) record { tokenIn = tokenIn ; tokenOut = tokenOut ; continues = false } refl p2 = ⊥-elim (get⊥ (sym (go tokenOut (go tokenIn (get p2)))))
+bothImplyStop d adr oref (Deposit pkh v) ctx@record { continues = false } refl p2 = ⊥-elim (get⊥ (sym (go (checkTokenOut (d .fst) ctx) (go (checkTokenIn (d .fst) ctx) (get p2)))))
 bothImplyStop d adr oref i@(Deposit pkh v) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator d i ctx) p2) ))
-bothImplyStop d adr oref (Transfer from to v) record { tokenIn = tokenIn ; tokenOut = tokenOut ; continues = false } refl p2 = ⊥-elim (get⊥ (sym (go tokenOut (go tokenIn (get p2)))))
+bothImplyStop d adr oref (Transfer from to v) ctx@record { continues = false } refl p2 = ⊥-elim (get⊥ (sym (go (checkTokenOut (d .fst) ctx) (go (checkTokenIn (d .fst) ctx) (get p2)))))
 bothImplyStop d adr oref i@(Transfer from to v) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator d i ctx) p2) ))
 bothImplyStop d adr oref Stop ctx refl p2 = (TStop (==Lto≡ (snd d) [] (go (not (continuing ctx)) (go (checkTokenIn (d .fst) ctx) (get p2)))) , (unNot (get (go (checkTokenIn (d .fst) ctx) (get p2)))) , refl , (get (get p2)))
 
@@ -1079,27 +1078,26 @@ removeStop record { dat = dat ; red = (Transfer from to v) ; ctx = ctx } p1 p2 =
 removeStop record { dat = dat ; red = Stop ; ctx = ctx } p1 p2 = ⊥-elim (p1 (==ito≡ (getMintedAmount ctx) (negsuc 0) (get (go (checkTokenIn (dat .fst) ctx) p2))))
 
 -- The proof of equivalence
-totalEquiv = record { to = λ { { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (+_ zero) } } } x → removeStop arg (λ ()) x ;
-                                { record { adr = adr ; oref = oref ; tn = tn ; dat = dat ; red = red ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = +[1+ zero ] } } } x → mintingImpliesInitial adr oref tn tt ctx refl x ;
-                                { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = +[1+ N.suc n ] } } } x → removeStop arg (λ ()) x ;
-                                { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc (N.suc n)) } } } x → removeStop arg (λ ()) x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Open pkh) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Open pkh) ctx (λ ()) x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Close pkh) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Close pkh) ctx (λ ()) x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Deposit pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Deposit pkh v) ctx (λ ()) x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Withdraw pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Withdraw pkh v) ctx (λ ()) x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Transfer from to v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Transfer from to v) ctx (λ ()) x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; red = Stop ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → bothImplyStop {0} dat adr oref Stop ctx refl x }
-                     ; from = λ { { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (+_ zero) } } } x → transitionImpliesValidator dat red ctx x ;
-                                { record { adr = adr ; oref = oref ; tn = tn ; dat = dat ; red = red ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = +[1+ zero ] } } } x → initialImpliesMinting adr oref tn tt ctx x ;
-                                { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = +[1+ N.suc n ] } } } x → transitionImpliesValidator dat red ctx x ;
-                                { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc (N.suc n)) } } } x → transitionImpliesValidator dat red ctx x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Open pkh) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Open pkh) ctx x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Close pkh) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Close pkh) ctx x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Deposit pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Deposit pkh v) ctx x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Withdraw pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Withdraw pkh v) ctx x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Transfer from to v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Transfer from to v) ctx x ;
-                                { record { adr = adr ; oref = oref ; dat = dat ; red = Stop; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; tokenIn = hasTokenIn ; tokenOut = hasTokenOut ; mint = (negsuc zero) } } } x → stopImpliesBoth {0} dat adr oref ctx x } } 
-
+totalEquiv = record { to = λ { { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = (+_ zero) } } } x → removeStop arg (λ ()) x ;
+                                { record { adr = adr ; oref = oref ; tn = tn ; dat = dat ; red = red ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = +[1+ zero ] } } } x → mintingImpliesInitial adr oref tn tt ctx refl x ;
+                                { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = +[1+ N.suc n ] } } } x → removeStop arg (λ ()) x ;
+                                { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = (negsuc (N.suc n)) } } } x → removeStop arg (λ ()) x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Open pkh) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Open pkh) ctx (λ ()) x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Close pkh) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Close pkh) ctx (λ ()) x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Deposit pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Deposit pkh v) ctx (λ ()) x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Withdraw pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Withdraw pkh v) ctx (λ ()) x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Transfer from to v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = (negsuc zero) } } } x → validatorImpliesTransition dat (Transfer from to v) ctx (λ ()) x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = Stop ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = (negsuc zero) } } } x → bothImplyStop {0} dat adr oref Stop ctx refl x }
+                     ; from = λ { { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = (+_ zero) } } } x → transitionImpliesValidator dat red ctx x ;
+                                { record { adr = adr ; oref = oref ; tn = tn ; dat = dat ; red = red ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = +[1+ zero ] } } } x → initialImpliesMinting adr oref tn tt ctx x ;
+                                { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = +[1+ N.suc n ] } } } x → transitionImpliesValidator dat red ctx x ;
+                                { arg@record { adr = adr ; oref = oref ; dat = dat ; red = red ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = (negsuc (N.suc n)) } } } x → transitionImpliesValidator dat red ctx x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Open pkh) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Open pkh) ctx x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Close pkh) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Close pkh) ctx x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Deposit pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Deposit pkh v) ctx x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Withdraw pkh v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Withdraw pkh v) ctx x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = (Transfer from to v) ; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = (negsuc zero) } } } x → transitionImpliesValidator dat (Transfer from to v) ctx x ;
+                                { record { adr = adr ; oref = oref ; dat = dat ; red = Stop; ctx = ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = continues ; inputRef = inputRef ; mint = (negsuc zero) } } } x → stopImpliesBoth {0} dat adr oref ctx x } } 
 
 
 \end{code}

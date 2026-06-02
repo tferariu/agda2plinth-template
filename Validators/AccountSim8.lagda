@@ -4,7 +4,7 @@ open import Haskell.Prelude hiding (lookup)
 open import Lib'
 open import Value'
 
-module Validators.AccountSim6' where
+module Validators.AccountSim8 where
 
 -- Defining the types of our Plinth Datum, referred to as Label in Agda
 \end{code}
@@ -29,8 +29,6 @@ record ScriptContext : Set where
         inputRef      : TxOutRef
         mint          : Integer
         tokCurrSymbol : CurrencySymbol
-        tokenIn       : Bool
-        tokenOut      : Bool
         validInterval : Interval
 \end{code}
 }
@@ -71,7 +69,7 @@ continuing ctx = ScriptContext.continues ctx
 \newcommand\accCheckTokOut{%
 \begin{code}
 checkTokenOut : AssetClass -> ScriptContext -> Bool
-checkTokenOut ac = ScriptContext.tokenOut
+checkTokenOut ac ctx = assetClassValueOf (ScriptContext.outputVal ctx) ac == 1
 \end{code}
 }
 
@@ -109,8 +107,7 @@ ownAssetClass : TokenName -> ScriptContext -> AssetClass
 ownAssetClass tn ctx = ((ScriptContext.tokCurrSymbol ctx) , tn)
 
 checkTokenIn : AssetClass -> ScriptContext -> Bool
-checkTokenIn ac = ScriptContext.tokenIn
-
+checkTokenIn ac ctx = assetClassValueOf (ScriptContext.inputVal ctx) ac == 1
 
         
 checkSigned : PubKeyHash -> ScriptContext -> Bool

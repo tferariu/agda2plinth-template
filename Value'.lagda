@@ -25,8 +25,8 @@ Value = Map AssetClass Integer
 \begin{code}
 lookupValue : AssetClass -> List (AssetClass × Integer) -> Integer
 lookupValue ac [] = 0
-lookupValue ac ((ac' , val') ∷ xs) =
-  if ac == ac' then val'
+lookupValue ac ((ac' , amt') ∷ xs) =
+  if ac == ac' then amt'
                else lookupValue ac xs
 \end{code}
 }
@@ -36,9 +36,25 @@ lookupValue ac ((ac' , val') ∷ xs) =
 \begin{code}
 deleteValue : AssetClass -> List (AssetClass × Integer) -> List (AssetClass × Integer) 
 deleteValue ac [] = []
-deleteValue ac ((ac' , val') ∷ xs) =
+deleteValue ac ((ac' , amt') ∷ xs) =
   if ac == ac' then xs
-               else (ac' , val') ∷ (deleteValue ac xs)
+               else (ac' , amt') ∷ (deleteValue ac xs)
+\end{code}
+}
+
+
+\newcommand\vEq{%
+\begin{code}
+eqValueAux : List (AssetClass × Integer) -> List (AssetClass × Integer) -> Bool
+eqValueAux [] [] = True
+eqValueAux [] ((ac , amt) ∷ vs) = if amt == 0 then eqValueAux [] vs else False
+eqValueAux ((ac , amt) ∷ vs) [] = if amt == 0 then eqValueAux vs [] else False
+eqValueAux ((ac , amt) ∷ vs) v2@((ac' , amt') ∷ vs')
+  = if amt == (lookupValue ac v2) then eqValueAux vs (deleteValue ac v2)
+                                  else False
+
+eqValue : Value -> Value -> Bool
+eqValue (unMap x) (unMap y) = eqValueAux x y 
 \end{code}
 }
 
@@ -49,36 +65,25 @@ addValueAux : List (AssetClass × Integer) -> List (AssetClass × Integer) -> Li
 addValueAux [] [] = []
 addValueAux [] (v ∷ vs) = v ∷ vs
 addValueAux (v ∷ vs) [] = v ∷ vs
-addValueAux v1@((ac , val) ∷ xs) v2@((ac' , val') ∷ ys)
-  = (ac , val + (lookupValue ac v2)) ∷ addValueAux xs (deleteValue ac v2)
+addValueAux ((ac , amt) ∷ vs) v2@((ac' , amt') ∷ vs')
+  = (ac , amt + (lookupValue ac v2)) ∷ addValueAux vs (deleteValue ac v2)
 
 addValue : Value -> Value -> Value
-addValue (MkMap v1) (MkMap v2) = MkMap (addValueAux v1 v2)
+addValue (unMap v1) (unMap v2) = unMap (addValueAux v1 v2)
 \end{code}
 }
 
 \newcommand\vSub{%
 \begin{code}
+negValueAux : List (AssetClass × Integer) -> List (AssetClass × Integer)
+negValueAux [] = []
+negValueAux ((ac , amt) ∷ vs) = (ac , (negateInteger amt)) ∷ (negValueAux vs)
+
 negValue : Value -> Value
-negValue (MkMap xs) = MkMap (map (λ (k , v) → (k , (negateInteger v))) xs)
+negValue (unMap xs) = unMap (negValueAux xs)
 
 subValue : Value -> Value -> Value
 subValue v1 v2 = addValue v1 (negValue v2)
-\end{code}
-}
-
-\newcommand\vEq{%
-\begin{code}
-eqValueAux : List (AssetClass × Integer) -> List (AssetClass × Integer) -> Bool
-eqValueAux [] [] = True
-eqValueAux [] (x ∷ xs) = if x .snd == 0 then eqValueAux [] xs else False
-eqValueAux (x ∷ xs) [] = if x .snd == 0 then eqValueAux xs [] else False
-eqValueAux v1@((ac , val) ∷ xs) v2@((ac' , val') ∷ ys)
-  = if val == (lookupValue ac v2) then eqValueAux xs (deleteValue ac v2)
-                                  else False
-
-eqValue : Value -> Value -> Bool
-eqValue (MkMap x) (MkMap y) = eqValueAux x y 
 \end{code}
 }
 
@@ -88,14 +93,14 @@ eqValue (MkMap x) (MkMap y) = eqValueAux x y
 \begin{code}
 ltValueAux : List (AssetClass × Integer) -> List (AssetClass × Integer) -> Bool
 ltValueAux [] [] = False
-ltValueAux [] (x ∷ xs) = if x .snd == 0 then ltValueAux [] xs else True
-ltValueAux (x ∷ xs) [] = False 
-ltValueAux v1@((ac , val) ∷ xs) v2@((ac' , val') ∷ ys)
-  = if val < (lookupValue ac v2) then ltValueAux xs (deleteValue ac v2)
+ltValueAux [] ((ac , amt) ∷ vs) = if amt == 0 then ltValueAux [] vs else True
+ltValueAux (v ∷ vs) [] = False 
+ltValueAux ((ac , amt) ∷ vs) v2@((ac' , amt') ∷ vs')
+  = if amt < (lookupValue ac v2) then ltValueAux vs (deleteValue ac v2)
                                  else False
 
 lt : Value -> Value -> Bool
-lt (MkMap x) (MkMap y) = ltValueAux x y 
+lt (unMap x) (unMap y) = ltValueAux x y 
 \end{code}
 }
 
@@ -115,18 +120,13 @@ geq v1 v2 = leq v2 v1
 \newcommand\vBuiltin{%
 \begin{code}
 emptyValue : Value
-emptyValue = MkMap []
+emptyValue = unMap []
 
 minValue : Value
-minValue = MkMap ((ada , 3) ∷ [])
+minValue = unMap ((ada , 3) ∷ [])
 
 x2MinValue : Value
-x2MinValue = MkMap ((ada , 6) ∷ [])
-
-lovelaces : Value -> Integer
-lovelaces (MkMap []) = 0
-lovelaces (MkMap ((ac , amt) ∷ xs)) = if ac == ada then amt
-                                         else lovelaces (MkMap xs)
+x2MinValue = unMap ((ada , 6) ∷ [])
 \end{code}
 }
 
@@ -144,7 +144,7 @@ instance
     { OrdFromLessThan iOrdFromLessThanValue }
 
   iNumberValue : Number Value
-  iNumberValue = record { Constraint = λ x → ⊤ ; fromNat = λ n → MkMap ((ada , (Integer.pos n)) ∷ []) }
+  iNumberValue = record { Constraint = λ x → ⊤ ; fromNat = λ n → unMap ((ada , (Integer.pos n)) ∷ []) }
 
   iNumValue : Num Value
   iNumValue .MinusOK _ _         = ⊤
@@ -156,27 +156,28 @@ instance
   iNumValue .negate x            = negValue x 
   iNumValue .abs x               = x 
   iNumValue .signum x            = x 
-  iNumValue .fromInteger n       = (MkMap ((ada , n) ∷ [])) 
+  iNumValue .fromInteger n       = (unMap ((ada , n) ∷ [])) 
 \end{code}
 }
 
 
 \newcommand\vHelper{%
 \begin{code}
+lovelaces : Value -> Integer
+lovelaces (unMap []) = 0
+lovelaces (unMap ((ac , amt) ∷ vs)) = if ac == ada then amt
+                                         else lovelaces (unMap vs)
+                                         
 assetClassValueOf : Value -> AssetClass -> Integer
-assetClassValueOf (MkMap []) ac = 0
-assetClassValueOf (MkMap ((ac' , amt) ∷ vs)) ac = if ac' == ac then amt else assetClassValueOf (MkMap vs) ac
+assetClassValueOf (unMap []) ac = 0
+assetClassValueOf (unMap ((ac' , amt) ∷ vs)) ac =
+  if ac' == ac then amt else assetClassValueOf (unMap vs) ac
 
 assetClassValue : AssetClass -> Integer -> Value
-assetClassValue ac amt = MkMap ((ac , amt) ∷ [])
-
-checkMinValue : Value -> Bool
-checkMinValue v = (assetClassValueOf v ada) >= 3
+assetClassValue ac amt = unMap ((ac , amt) ∷ [])
 \end{code}
 }
 
-
---Postulated properties of Value. 
 
 
 \newcommand\vPostulate{%
@@ -184,10 +185,13 @@ checkMinValue v = (assetClassValueOf v ada) >= 3
 postulate
   commVal : ∀ (a b : Value) -> a + b ≡ b + a
   assocVal : ∀ (a b c : Value) -> (a + b) + c ≡ a + (b + c)
-  v=v : ∀ (v : Value) -> (v == v) ≡ True
+  v=v : ∀ (a : Value) -> (a == a) ≡ True
   ==vto≡ : ∀ (a b : Value) -> (a == b) ≡ True -> a ≡ b
   ≡vto== : ∀ (a b : Value) -> a ≡ b -> (a == b) ≡ True
-  
+\end{code}
+}
+
+\begin{code}[hide] 
   addValIdL : ∀ (a : Value) -> emptyValue + a ≡ a
   addValIdR : ∀ (a : Value) -> a + emptyValue ≡ a
   
@@ -225,15 +229,14 @@ postulate
   lovelaceLemma : ∀ (a : Value) 
                         -> (lovelaces a >= lovelaces x2MinValue) ≡ True
                         -> geq a x2MinValue ≡ True
-\end{code}
-}
 
-  
-\begin{code}[hide]
 switchSides'' : ∀ (a b c : Value) -> a + b ≡ c -> a ≡ c - b
 switchSides'' a b c p rewrite doubleNeg b | sym p
   | (assocVal a (negValue (negValue b)) (negValue (negValue (negValue b))))
   | v-v (negValue (negValue b)) | addValIdR a = refl 
+
+checkMinValue : Value -> Bool
+checkMinValue v = (assetClassValueOf v ada) >= 3
 
 {-
 sumLemma' : ∀ (a b : Value)

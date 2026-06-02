@@ -36,6 +36,25 @@ Interval = (POSIXTime × POSIXTime)
 }
 
 
+
+\newcommand\libBefore{%
+\begin{code}
+before : POSIXTime -> Interval -> Bool
+before record { getPOSIXTime = time } (start , end)
+  = time < (getPOSIXTime start)
+\end{code}
+}
+
+
+\newcommand\libAfter{%
+\begin{code}
+after : POSIXTime -> Interval -> Bool
+after record { getPOSIXTime = time } (start , end)
+  = time > (getPOSIXTime end)
+\end{code}
+}
+
+
 \newcommand\libAda{%
 \begin{code}
 ada : AssetClass
@@ -44,10 +63,11 @@ ada = (0 , 0)
 }
 
 
+
 \newcommand\libMap{%
 \begin{code}
-data Map (a b : Set) : Set where
- MkMap : List (a × b) -> Map a b
+data Map (k v : Set) : Set where
+ unMap : List (k × v) -> Map k v
 \end{code}
 }
 

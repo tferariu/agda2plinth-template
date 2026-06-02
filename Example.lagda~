@@ -1,0 +1,41 @@
+\begin{code}[hide]
+
+open import Haskell.Prelude
+open import Lib
+open import Value
+
+module Example where
+
+\end{code}
+
+\newcommand\exOne{%
+\begin{code}
+example : Nat -> Nat -> Nat
+example a b = if a == b then a else b
+\end{code}
+}
+
+\newcommand\exTwo{%
+\begin{code}
+example2 : PubKeyHash -> PubKeyHash -> PubKeyHash
+example2 a b = if a == b then a else b
+\end{code}
+}
+
+\newcommand\exPragma{%
+\begin{code}
+{-# COMPILE AGDA2HS example #-}
+\end{code}
+}
+
+\newcommand\exEx{%
+\begin{code}
+{-# COMPILE AGDA2HS example2 #-}
+\end{code}
+}
+
+
+
+
+
+

@@ -4,7 +4,7 @@ open import Haskell.Prelude hiding (lookup)
 open import Lib'
 open import Value'
 
-module Validators.AccountSim6' where
+module Validators.AccountSim7' where
 
 -- Defining the types of our Plinth Datum, referred to as Label in Agda
 \end{code}
@@ -24,7 +24,7 @@ record ScriptContext : Set where
         outputVal     : Value
         outputDatum   : Datum
         payments      : List (PubKeyHash × Value)
-        signature     : PubKeyHash
+        signatures    : List PubKeyHash
         continues     : Bool
         inputRef      : TxOutRef
         mint          : Integer
@@ -68,29 +68,6 @@ continuing ctx = ScriptContext.continues ctx
 \end{code}
 }
 
-\newcommand\accCheckTokOut{%
-\begin{code}
-checkTokenOut : AssetClass -> ScriptContext -> Bool
-checkTokenOut ac = ScriptContext.tokenOut
-\end{code}
-}
-
-\newcommand\accCheckTokOutAddr{%
-\begin{code}
-checkTokenOutAddr : Address -> AssetClass -> ScriptContext -> Bool
-checkTokenOutAddr adr = checkTokenOut
-\end{code}
-}
-
-
-\newcommand\accGetMintedAmt{%
-\begin{code}
-getMintedAmount : ScriptContext -> Integer
-getMintedAmount ctx = ScriptContext.mint ctx 
-\end{code}
-}
-
-
 
 
 
@@ -104,6 +81,8 @@ getPayment' pkh ((pkh' , v) ∷ xs)
 getPayment : PubKeyHash -> ScriptContext -> Value
 getPayment pkh ctx = getPayment' pkh (ScriptContext.payments ctx)
 
+getMintedAmount : ScriptContext -> Integer
+getMintedAmount ctx = ScriptContext.mint ctx 
 
 ownAssetClass : TokenName -> ScriptContext -> AssetClass
 ownAssetClass tn ctx = ((ScriptContext.tokCurrSymbol ctx) , tn)
@@ -111,10 +90,15 @@ ownAssetClass tn ctx = ((ScriptContext.tokCurrSymbol ctx) , tn)
 checkTokenIn : AssetClass -> ScriptContext -> Bool
 checkTokenIn ac = ScriptContext.tokenIn
 
+checkTokenOut : AssetClass -> ScriptContext -> Bool
+checkTokenOut ac = ScriptContext.tokenOut
 
+sigElem : PubKeyHash -> List PubKeyHash -> Bool
+sigElem sig [] = False
+sigElem sig (x ∷ sigs) = if sig == x then True else sigElem sig sigs
         
 checkSigned : PubKeyHash -> ScriptContext -> Bool
-checkSigned sig ctx = ScriptContext.signature ctx == sig
+checkSigned sig ctx = sigElem sig (ScriptContext.signatures ctx)
 
 checkTokenBurned : AssetClass -> ScriptContext -> Bool
 checkTokenBurned tok ctx = ScriptContext.mint ctx == -1
@@ -131,7 +115,8 @@ newDatumAddr adr ctx = newDatum ctx
 newValueAddr : Address -> ScriptContext -> Value
 newValueAddr adr ctx = newValue ctx
 
-
+checkTokenOutAddr : Address -> AssetClass -> ScriptContext -> Bool
+checkTokenOutAddr adr = checkTokenOut
 
 checkPayment : PubKeyHash -> Value -> ScriptContext -> Bool
 checkPayment pkh v ctx = getPayment pkh ctx == v
@@ -204,14 +189,6 @@ isJust (Just v) = True
 \end{code}
 }
 
-\newcommand\accIsNothing{%
-\begin{code}
-isNothing : Maybe Value -> Bool
-isNothing Nothing = True
-isNothing (Just v) = False
-\end{code}
-}
-
 
 \newcommand\accCheckEmpty{%
 \begin{code}
@@ -228,7 +205,7 @@ checkWithdraw : AssetClass -> Maybe Value -> PubKeyHash -> Value
 checkWithdraw tok Nothing _ _ _ _ = False
 checkWithdraw tok (Just v) pkh val map ctx =
   geq val emptyValue && geq v val &&
-  newDatum ctx == (tok , insert pkh (v - val) map)
+  (newDatum ctx == (tok , insert pkh (v - val) map))
 \end{code}
 }
 
@@ -240,7 +217,7 @@ checkDeposit : AssetClass -> Maybe Value -> PubKeyHash -> Value
 checkDeposit tok Nothing _ _ _ _ = False
 checkDeposit tok (Just v) pkh val map ctx =
   geq val emptyValue &&
-  newDatum ctx == (tok , insert pkh (v + val) map)
+  (newDatum ctx == (tok , insert pkh (v + val) map))
 \end{code}
 }
 
@@ -281,11 +258,13 @@ agdaValidator (tok , map) red ctx = checkTokenIn tok ctx &&
 \newcommand\accOpen{%
 \begin{code}
     (Open pkh) -> checkTokenOut tok ctx && continuing ctx &&
-                  checkSigned pkh ctx && isNothing (lookup pkh map) &&
+                  checkSigned pkh ctx &&
+                  not (isJust (lookup pkh map)) &&
                   newDatum ctx == (tok , insert pkh emptyValue map) &&
                   newValue ctx == oldValue ctx
 \end{code}
 }
+
 
 \newcommand\accClose{%
 \begin{code}
@@ -299,19 +278,20 @@ agdaValidator (tok , map) red ctx = checkTokenIn tok ctx &&
 
 \newcommand\accDeposit{%
 \begin{code}
-    (Deposit pkh val) -> checkTokenOut tok ctx && continuing ctx &&
-                         checkSigned pkh ctx &&
-                         checkDeposit tok (lookup pkh map) pkh val map ctx &&
-                         newValue ctx == oldValue ctx + val
+    (Withdraw pkh val) -> checkTokenOut tok ctx && continuing ctx &&
+                          checkSigned pkh ctx &&
+                          checkWithdraw tok (lookup pkh map) pkh val map ctx &&
+                          newValue ctx == oldValue ctx - val
 \end{code}
 }
 
 \newcommand\accWithdraw{%
 \begin{code}
-    (Withdraw pkh val) -> checkTokenOut tok ctx && continuing ctx &&
-                          checkSigned pkh ctx &&
-                          checkWithdraw tok (lookup pkh map) pkh val map ctx &&
-                          newValue ctx == oldValue ctx - val
+    (Deposit pkh val) -> checkTokenOut tok ctx && continuing ctx &&
+                         checkSigned pkh ctx &&
+                         checkDeposit tok (lookup pkh map) pkh val map ctx &&
+                         newValue ctx == oldValue ctx + val
+
 \end{code}
 }
 
@@ -352,13 +332,21 @@ checkValue addr tn ctx = checkTokenOutAddr addr (ownAssetClass tn ctx) ctx &&
 \end{code}
 }
 
+\newcommand\accIsInitial{%
+\begin{code}
+isInitial : Address -> TxOutRef -> TokenName -> ScriptContext -> Bool
+isInitial addr oref tn ctx = consumes oref ctx &&
+                          checkDatum addr tn ctx &&
+                          checkValue addr tn ctx
+\end{code}
+}
 
 \newcommand\accPolicy{%
 \begin{code}
 agdaPolicy : Address -> TxOutRef -> TokenName -> ⊤ -> ScriptContext -> Bool
 agdaPolicy addr oref tn _ ctx =
-  if      amt == 1  then continuingAddr addr ctx && consumes oref ctx &&
-                         checkDatum addr tn ctx && checkValue addr tn ctx
+  if      amt == 1  then continuingAddr addr ctx &&
+                         isInitial addr oref tn ctx 
   else if amt == -1 then not (continuingAddr addr ctx)
        else False
   where
@@ -373,6 +361,7 @@ agdaPolicy addr oref tn _ ctx =
 
 {-# COMPILE AGDA2HS checkDatum #-}
 {-# COMPILE AGDA2HS checkValue #-}
+{-# COMPILE AGDA2HS isInitial #-}
 
 {-# COMPILE AGDA2HS agdaPolicy #-}
 
