@@ -1,4 +1,4 @@
-\begin{code}
+\begin{code}[hide]
 open import Agda.Builtin.Char
 open import Agda.Builtin.Equality
 open import Agda.Builtin.Bool
@@ -30,6 +30,52 @@ open import Lib'
 module ProofLib' where
 
 --Various lemmas about the agda2hs Haskell prelude and relating it to the standard library
+
+\end{code}
+
+\newcommand\libGet{%
+\begin{code}
+get : ∀ {a b : Bool} -> (a && b) ≡ true -> a ≡ true
+get {true} {true} pf = refl
+\end{code}
+}
+
+\newcommand\libGo{%
+\begin{code}
+go : ∀ (a : Bool) {b} -> (a && b) ≡ true -> b ≡ true
+go true {b} pf = pf
+\end{code}
+}
+
+\newcommand\libEqNat{%
+\begin{code}
+==to≡ : ∀ (a b : Nat) -> (a == b) ≡ true -> a ≡ b
+==to≡ zero zero p = refl
+==to≡ (Nat.suc a) (Nat.suc b) p = cong Nat.suc (==to≡ a b p)
+\end{code}
+}
+
+\newcommand\libEqSelf{%
+\begin{code}
+n=n : ∀ (n : Nat) -> (n == n) ≡ true
+n=n zero = refl
+n=n (Nat.suc n) = n=n n
+\end{code}
+}
+
+\newcommand\libEquivNat{%
+\begin{code}
+≡to== : ∀ {a b : Nat} -> a ≡ b -> (a == b) ≡ true
+≡to== {a} refl = n=n a
+\end{code}
+}
+
+
+
+\begin{code}[hide]
+
+test : ∀ (a b c d e : Bool) -> ((a && b && (c && d) && e) ≡ true) -> d ≡ true
+test a b c d e ex = go c (get (go b (go a ex)))
 
 sub : ∀ {a b c : ℤ} -> a ≡ b -> a ≡ c -> b ≡ c
 sub refl refl = refl
@@ -75,10 +121,6 @@ sub≡ (+_ n) (negsuc m) = refl
 sub≡ (negsuc n) (+_ m) rewrite ni≡ (+ m) = add≡ (negsuc n) (- (+ m))
 sub≡ (negsuc n) (negsuc m) = subN≡ (N.suc m) (N.suc n)
 
-==to≡ : ∀ (a b : Nat) -> (a == b) ≡ true -> a ≡ b
-==to≡ zero zero p = refl
-==to≡ (Nat.suc a) (Nat.suc b) p = cong Nat.suc (==to≡ a b p)
-
 ==ito≡ : ∀ (a b : Integer) -> (a == b) ≡ true -> a ≡ b
 ==ito≡ (pos n) (pos m) pf = cong (+_) (==to≡ n m pf)
 ==ito≡ (negsuc n) (negsuc m) pf = cong negsuc (==to≡ n m pf)
@@ -86,9 +128,6 @@ sub≡ (negsuc n) (negsuc m) = subN≡ (N.suc m) (N.suc n)
 doubleMinus : ∀ (a b : Integer) -> a - - b ≡ a + b
 doubleMinus a b rewrite neg-involutive b = refl
 
-n=n : ∀ (n : Nat) -> eqNat n n ≡ true
-n=n zero = refl
-n=n (N.suc n) = n=n n
 
 i=i : ∀ (i : Integer) -> (eqInteger i i) ≡ true
 i=i (pos zero) = refl
@@ -113,12 +152,6 @@ monusLemma (N.suc n) (N.suc m) = monusLemma n m
 geqNatLemma : ∀ (n : Nat) -> (n >= 0) ≡ true
 geqNatLemma zero = refl
 geqNatLemma (N.suc n) = refl
-
-go : ∀ (a : Bool) {b} -> (a && b) ≡ true -> b ≡ true
-go true {b} pf = pf
-
-get : ∀ {a b : Bool} -> (a && b) ≡ true -> a ≡ true
-get {true} {true} pf = refl
 
 leqNto≤N : ∀ {a b} -> (ltNat a b || eqNat a b) ≡ true -> a N.≤ b
 leqNto≤N {zero} {zero} pf = N.z≤n
@@ -168,6 +201,15 @@ n≠n n p rewrite n=n n = get⊥ p
 &&false : ∀ (a : Bool) -> (a && false) ≡ true -> ⊥
 &&false true ()
 
+&&2false : ∀ (a b : Bool) -> (a && b && false) ≡ true -> ⊥
+&&2false true true ()
+
+&&3false : ∀ (a b c : Bool) -> (a && b && c && false) ≡ true -> ⊥
+&&3false true true true ()
+
+&&4false : ∀ (a b c d : Bool) -> (a && b && c && d && false) ≡ true -> ⊥
+&&4false true true true true ()
+
 &&5false : ∀ (a b c d e : Bool) -> (a && b && c && d && e && false) ≡ true -> ⊥
 &&5false true true true true true ()
 
@@ -176,24 +218,6 @@ n≠n n p rewrite n=n n = get⊥ p
 
 &&7false : ∀ (a b c d e f g : Bool) -> (a && b && c && d && e && f && g && false) ≡ true -> ⊥
 &&7false true true true true true true true ()
-
-&&6false' : ∀ {a b c d e f : Bool} -> (a && b && c && d && e && f && false) ≡ true -> ⊥
-&&6false' {false} {b} {c} {d} {e} {f} ()
-&&6false' {true} {false} {c} {d} {e} {f} ()
-&&6false' {true} {true} {false} {d} {e} {f} ()
-&&6false' {true} {true} {true} {false} {e} {f} ()
-&&6false' {true} {true} {true} {true} {false} {f} ()
-&&6false' {true} {true} {true} {true} {true} {false} = λ ()
-&&6false' {true} {true} {true} {true} {true} {true} = λ ()
-
-&&4false : ∀ (a b c d : Bool) -> (a && b && c && d && false) ≡ true -> ⊥
-&&4false true true true true ()
-
-&&2false : ∀ (a b : Bool) -> (a && b && false) ≡ true -> ⊥
-&&2false true true ()
-
-&&3false : ∀ (a b c : Bool) -> (a && b && c && false) ≡ true -> ⊥
-&&3false true true true ()
 
 rewriteJust : ∀ {a : Maybe ℤ} {v v'} -> a ≡ Just v -> v ≡ v' -> a ≡ Just v'
 rewriteJust refl refl = refl
@@ -305,10 +329,6 @@ orToSum true b pf = inj₁ refl
 t=f : ∀ (a : Bool) -> not a ≡ true -> a ≡ true -> true ≡ false
 t=f false p1 p2 = sym p2
 t=f true p1 p2 = sym p1
-
-≡to== : ∀ {a b : Nat} -> a ≡ b -> (a == b) ≡ true
-≡to== {zero} refl = refl
-≡to== {suc a} refl = ≡to== {a} refl
 
 ≡to==i : ∀ {a b : Integer} -> a ≡ b -> (a == b) ≡ true
 ≡to==i {pos n} refl = n=n n
@@ -424,3 +444,6 @@ lengthToLengthNat (N.suc n) (x ∷ l) (N.s≤s p) = lengthToLengthNat n l p
 
 
 \end{code}
+
+
+
