@@ -34,7 +34,8 @@ lookupValue ac ((ac' , amt') ∷ xs) =
 
 \newcommand\vDelete{%
 \begin{code}
-deleteValue : AssetClass -> List (AssetClass × Integer) -> List (AssetClass × Integer) 
+deleteValue : AssetClass -> List (AssetClass × Integer)
+           -> List (AssetClass × Integer) 
 deleteValue ac [] = []
 deleteValue ac ((ac' , amt') ∷ xs) =
   if ac == ac' then xs
@@ -45,7 +46,8 @@ deleteValue ac ((ac' , amt') ∷ xs) =
 
 \newcommand\vEq{%
 \begin{code}
-eqValueAux : List (AssetClass × Integer) -> List (AssetClass × Integer) -> Bool
+eqValueAux : List (AssetClass × Integer)
+          -> List (AssetClass × Integer) -> Bool
 eqValueAux [] [] = True
 eqValueAux [] ((ac , amt) ∷ vs) = if amt == 0 then eqValueAux [] vs else False
 eqValueAux ((ac , amt) ∷ vs) [] = if amt == 0 then eqValueAux vs [] else False
@@ -61,7 +63,8 @@ eqValue (unMap x) (unMap y) = eqValueAux x y
 
 \newcommand\vAdd{%
 \begin{code}
-addValueAux : List (AssetClass × Integer) -> List (AssetClass × Integer) -> List (AssetClass × Integer)
+addValueAux : List (AssetClass × Integer)
+           -> List (AssetClass × Integer) -> List (AssetClass × Integer)
 addValueAux [] [] = []
 addValueAux [] (v ∷ vs) = v ∷ vs
 addValueAux (v ∷ vs) [] = v ∷ vs
@@ -91,7 +94,8 @@ subValue v1 v2 = addValue v1 (negValue v2)
 
 \newcommand\vLt{%
 \begin{code}
-ltValueAux : List (AssetClass × Integer) -> List (AssetClass × Integer) -> Bool
+ltValueAux : List (AssetClass × Integer)
+          -> List (AssetClass × Integer) -> Bool
 ltValueAux [] [] = False
 ltValueAux [] ((ac , amt) ∷ vs) = if amt == 0 then ltValueAux [] vs else True
 ltValueAux (v ∷ vs) [] = False 
@@ -160,14 +164,19 @@ instance
 \end{code}
 }
 
-
-\newcommand\vHelper{%
-\begin{code}
+\newcommand\vLovelaces{%
+\begin{code}                                       
 lovelaces : Value -> Integer
 lovelaces (unMap []) = 0
 lovelaces (unMap ((ac , amt) ∷ vs)) = if ac == ada then amt
                                          else lovelaces (unMap vs)
+\end{code}
+}
+
+
                                          
+\newcommand\vHelper{%
+\begin{code}                                       
 assetClassValueOf : Value -> AssetClass -> Integer
 assetClassValueOf (unMap []) ac = 0
 assetClassValueOf (unMap ((ac' , amt) ∷ vs)) ac =
@@ -191,31 +200,57 @@ postulate
 \end{code}
 }
 
-\begin{code}[hide] 
-  addValIdL : ∀ (a : Value) -> emptyValue + a ≡ a
-  addValIdR : ∀ (a : Value) -> a + emptyValue ≡ a
-  
-  switchSides  : ∀ (a b c : Value) -> a - b ≡ c -> a ≡ c + b
-  switchSides' : ∀ (a b c : Value) -> a + b ≡ c -> a ≡ c - b
-  
-  doubleNeg : ∀ (a : Value) -> a ≡ negValue (negValue a)
 
-  v-v : ∀ (a : Value) -> subValue a a ≡ emptyValue
-
-  geq-refl : ∀ (a : Value) -> geq a a ≡ True
-  
-  notGeqToLt : ∀ (a b : Value) -> geq a b ≡ False -> lt a b ≡ True
-  ltToGt : ∀ (a b : Value) -> lt a b ≡ True -> gt b a ≡ True
-  geqTrans : ∀ (a b c : Value) -> geq a b ≡ True -> geq b c ≡ True -> geq a c ≡ True
-
+\newcommand\vSumLem{%
+\begin{code}
   sumLemma : ∀ (a b : Value)
            -> geq a emptyValue ≡ True
            -> geq b emptyValue ≡ True
            -> geq (addValue a b) emptyValue ≡ True
+\end{code}
+}
 
+\newcommand\vDiffLem{%
+\begin{code}
   diffLemma : ∀ (a b : Value)
             -> geq a b ≡ True
             -> geq (subValue a b) emptyValue ≡ True
+\end{code}
+}
+
+
+
+\newcommand\vValID{%
+\begin{code}
+  addValIdL : ∀ (a : Value) -> emptyValue + a ≡ a
+  addValIdR : ∀ (a : Value) -> a + emptyValue ≡ a
+\end{code}
+}
+
+
+\newcommand\vDN{%
+\begin{code}
+  v-v : ∀ (a : Value) -> subValue a a ≡ emptyValue
+\end{code}
+}
+
+
+
+\newcommand\vGEQRefl{%
+\begin{code}
+  geq-refl : ∀ (a : Value) -> geq a a ≡ True
+\end{code}
+}
+
+
+
+\begin{code}[hide] 
+
+  doubleNeg : ∀ (a : Value) -> a ≡ negValue (negValue a)
+  
+  notGeqToLt : ∀ (a b : Value) -> geq a b ≡ False -> lt a b ≡ True
+  ltToGt : ∀ (a b : Value) -> lt a b ≡ True -> gt b a ≡ True
+  geqTrans : ∀ (a b c : Value) -> geq a b ≡ True -> geq b c ≡ True -> geq a c ≡ True
 
   geqAddTrans : ∀ (a b c d : Value)
               -> geq a (addValue b c) ≡ True
@@ -230,13 +265,12 @@ postulate
                         -> (lovelaces a >= lovelaces x2MinValue) ≡ True
                         -> geq a x2MinValue ≡ True
 
-switchSides'' : ∀ (a b c : Value) -> a + b ≡ c -> a ≡ c - b
-switchSides'' a b c p rewrite doubleNeg b | sym p
-  | (assocVal a (negValue (negValue b)) (negValue (negValue (negValue b))))
-  | v-v (negValue (negValue b)) | addValIdR a = refl 
 
 checkMinValue : Value -> Bool
 checkMinValue v = (assetClassValueOf v ada) >= 3
+
+
+
 
 {-
 sumLemma' : ∀ (a b : Value)
@@ -308,4 +342,19 @@ lovelaceDiffLemma' (MkMap (x ∷ x₁)) i refl = {!!}
 \end{code}
 
 
+\newcommand\vSSone{%
+\begin{code}
+switchSides : ∀ (a b c : Value) -> a - b ≡ c -> a ≡ c + b
+switchSides a b c p rewrite sym p
+  | assocVal a (negValue b) b | commVal (negValue b) b
+  | v-v b | addValIdR a = refl
+\end{code}
+}
 
+\newcommand\vSStwo{%
+\begin{code}
+switchSides' : ∀ (a b c : Value) -> a + b ≡ c -> a ≡ c - b
+switchSides' a b c p rewrite sym p
+  | assocVal a b (negValue b) | v-v b | addValIdR a = refl
+\end{code}
+}

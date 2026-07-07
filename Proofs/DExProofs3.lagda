@@ -117,13 +117,13 @@ data _⊢_~[_]~*_ : MParams -> State -> List Redeemer -> State -> Set where
     -------------------------
     -> par ⊢ s ~[ ((Stop) ∷ is) ]~* s'-}
 
-data _⊢_~[_]~*|_ : MParams -> State -> List Redeemer -> State -> Set where
+data _⊢_~[_]~|*_ : MParams -> State -> List Redeemer -> State -> Set where
 
   fin : ∀ { par s s' s'' is i }
     -> par ⊢ s ~[ is ]~* s'
     -> par ⊢ s' ~[ i ]~| s''
     -------------------------
-    -> par ⊢ s ~[ (is ++ [ i ]) ]~*| s''
+    -> par ⊢ s ~[ (is ++ [ i ]) ]~|* s''
 
 -- State Validity Predicate
 valid : State -> Set 
@@ -148,7 +148,7 @@ validStateTransition v (TExchange x refl x₂ x₃) = v
 --there and have no value left in the contract)
 liquidity : ∀ (par : MParams) (s : State) 
           -> valid s
-          -> ∃[ s' ] ∃[ is ] ((par ⊢ s ~[ is ]~*| s') × (value s' ≡ emptyValue) )
+          -> ∃[ s' ] ∃[ is ] ((par ⊢ s ~[ is ]~|* s') × (value s' ≡ emptyValue) )
 
 liquidity par s v = ⟨ s' , ⟨  Stop ∷ [] , (fin nil (TStop refl) , refl) ⟩ ⟩
   where

@@ -20,16 +20,16 @@ Datum = (AssetClass × AccMap)
 \begin{code}
 record ScriptContext : Set where
     field     
-        inputVal      : Value
-        outputVal     : Value
-        outputDatum   : Datum
-        payments      : List (PubKeyHash × Value)
-        signature     : PubKeyHash
-        continues     : Bool
-        inputRef      : TxOutRef
-        mint          : Integer
-        tokCurrSymbol : CurrencySymbol
-        validInterval : Interval
+        inputVal         : Value
+        outputVal        : Value
+        outputDatum      : Datum
+        payments         : List (PubKeyHash × Value)
+        signature        : PubKeyHash
+        continues        : Bool
+        inputRef         : TxOutRef
+        mint             : Integer
+        tokCurrSymbol    : CurrencySymbol
+        validInterval    : Interval
 \end{code}
 }
 
@@ -55,7 +55,6 @@ oldValue ctx = ScriptContext.inputVal ctx
 \begin{code}
 newValue : ScriptContext -> Value
 newValue ctx = ScriptContext.outputVal ctx
-
 \end{code}
 }
 
@@ -69,7 +68,8 @@ continuing ctx = ScriptContext.continues ctx
 \newcommand\accCheckTokOut{%
 \begin{code}
 checkTokenOut : AssetClass -> ScriptContext -> Bool
-checkTokenOut ac ctx = assetClassValueOf (ScriptContext.outputVal ctx) ac == 1
+checkTokenOut ac ctx
+  = assetClassValueOf (ScriptContext.outputVal ctx) ac == 1
 \end{code}
 }
 
@@ -102,6 +102,8 @@ getPayment' pkh ((pkh' , v) ∷ xs)
 getPayment : PubKeyHash -> ScriptContext -> Value
 getPayment pkh ctx = getPayment' pkh (ScriptContext.payments ctx)
 
+ownCurrencySymbol : ScriptContext -> CurrencySymbol
+ownCurrencySymbol = ScriptContext.tokCurrSymbol
 
 ownAssetClass : TokenName -> ScriptContext -> AssetClass
 ownAssetClass tn ctx = ((ScriptContext.tokCurrSymbol ctx) , tn)
