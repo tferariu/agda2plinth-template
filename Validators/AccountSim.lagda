@@ -1,10 +1,10 @@
 \begin{code}[hide]
 
 open import Haskell.Prelude hiding (lookup)
-open import Lib'
-open import Value'
+open import Lib
+open import Value
 
-module Validators.AccountSim8 where
+module Validators.AccountSim where
 
 -- Defining the types of our Plinth Datum, referred to as Label in Agda
 \end{code}

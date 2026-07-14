@@ -1,7 +1,7 @@
 \begin{code}[hide]
-open import Validators.AccountSim8
-open import Lib'
-open import Value'
+open import Validators.AccountSim
+open import Lib
+open import Value
 
 open import Agda.Builtin.Char
 open import Agda.Builtin.Equality
@@ -30,9 +30,9 @@ open import Haskell.Prelude using (_+_ ; _-_)
 open import Function.Base using (_∋_)
 open _×_×_
 
-open import ProofLib'
+open import ProofLib
 
-module Proofs.AccountSimProofs9 where
+module Proofs.AccountSimProofs where
 
 -- Model and proofs for the Account Simulation contract
   
@@ -912,20 +912,9 @@ minValLiquidity s par (p1 , p2) rewrite iVal≡ s
 }
 
 
-\begin{code}[hide]
 
-
-       
-       
--- Multi-Step transition lemma
-lemmaMultiStep : ∀ (s s' s'' : State) (is is' : List Redeemer) {par}
-                   -> par ⊢  s  ~[ is  ]~* s'
-                   -> par ⊢ s' ~[ is' ]~* s''
-                   -> par ⊢ s  ~[ is ++ is' ]~* s''
-lemmaMultiStep s .s s'' [] is' nil p2 = p2
-lemmaMultiStep s s' s'' (x ∷ is) is' (cons {s' = s'''} p1 p2) p3 = cons p1 (lemmaMultiStep s''' s' s'' is is' p2 p3)
-
-
+\newcommand\mORW{%
+\begin{code}
 originStateRewrite : ∀ {sig spn tokCS} (par : MParams)
                        (s s' : State) (i : Redeemer)
                  -> par ⊢ s ~[ i ]~> s'
@@ -936,7 +925,11 @@ originStateRewrite : ∀ {sig spn tokCS} (par : MParams)
                            ; spends = spn
                            ; threadTokCS = tokCS
                            } ~[ i ]~> s'
-                           
+\end{code}
+}
+
+\newcommand\mORWp{%
+\begin{code}                           
 originStateRewrite par s s' i (TOpen x x₁ x₂ x₃ x₄)
   = TOpen x x₁ x₂ x₃ x₄
 originStateRewrite par s s' i (TClose x x₁ x₂ x₃ x₄)
@@ -947,8 +940,173 @@ originStateRewrite par s s' i (TWithdraw x x₁ x₂ x₃ x₄ x₅ x₆)
   = TWithdraw x x₁ x₂ x₃ x₄ x₅ x₆
 originStateRewrite par s s' i (TTransfer x x₁ x₂ x₃ x₄ x₅ x₆ x₇ x₈)
   = TTransfer x x₁ x₂ x₃ x₄ x₅ x₆ x₇ x₈
+\end{code}
+}
 
-targetStateRewrite : ∀ {spn tokCS} (par : MParams) (s s' : State) (i : Redeemer)
+\newcommand\mSkipInsert{%
+\begin{code}                           
+skipInsert : ∀ {val} (pkh1 pkh2 : PubKeyHash) (map : AccMap)
+             -> pkh1 ≢ pkh2
+             -> lookup pkh2 map ≡ lookup pkh2 (insert pkh1 val map)        
+\end{code}
+}
+
+
+\newcommand\mSkipInsertp{%
+\begin{code}                           
+skipInsert pkh1 pkh2 [] p with pkh2 == pkh1 in eq
+...| True = ⊥-elim (p (sym (==to≡ pkh2 pkh1 eq)))
+...| False = refl
+skipInsert pkh1 pkh2 (x ∷ map') p with pkh2 == (x .fst) in eq1
+skipInsert pkh1 pkh2 (x ∷ map') p | True with pkh1 == (x .fst) in eq2
+skipInsert pkh1 pkh2 (x ∷ map') p | True | True
+  rewrite ==to≡ pkh2 (x .fst) eq1 | ==to≡ pkh1 (x .fst) eq2 = ⊥-elim (p refl)
+skipInsert pkh1 pkh2 (x ∷ map') p | True | False rewrite eq1 = refl
+skipInsert pkh1 pkh2 (x ∷ map') p | False with pkh1 == (x .fst) in eq2
+skipInsert pkh1 pkh2 (x ∷ map') p | False | True 
+  rewrite sym (==to≡ pkh1 (x .fst) eq2) | eq1 = refl
+skipInsert pkh1 pkh2 (x ∷ map') p | False | False rewrite eq1
+  = skipInsert pkh1 pkh2 map' p        
+\end{code}
+}
+
+\newcommand\mOAD{%
+\begin{code}                           
+otherAccountsUnaffectedD :
+  ∀ {val} (s s' : State) (par : MParams) (pkh1 pkh2 : PubKeyHash)
+  -> par ⊢ s ~[ Deposit pkh1 val ]~> s'
+  -> pkh1 ≢ pkh2
+  -> lookup pkh2 (accMap s) ≡ lookup pkh2 (accMap s')
+otherAccountsUnaffectedD record {datum = (tok , map)} s' par pkh1 pkh2
+  (TDeposit refl refl c d refl refl) p2 = skipInsert pkh1 pkh2 map p2
+\end{code}
+}
+
+
+\newcommand\mOAW{%
+\begin{code}                           
+otherAccountsUnaffectedW :
+  ∀ {val} (s s' : State) (par : MParams) (pkh1 pkh2 : PubKeyHash)
+  -> par ⊢ s ~[ Withdraw pkh1 val ]~> s'
+  -> pkh1 ≢ pkh2
+  -> lookup pkh2 (accMap s) ≡ lookup pkh2 (accMap s')
+otherAccountsUnaffectedW record {datum = (tok , map)} s' par pkh1 pkh2
+  (TWithdraw refl refl c d e refl refl) p2 = skipInsert pkh1 pkh2 map p2
+\end{code}
+}
+
+\newcommand\mRWD{%
+\begin{code}                           
+rwDatum : ∀ {tok : AssetClass} (pkh : PubKeyHash) (v : Value) (map : AccMap)
+  -> (tok , insert pkh emptyValue map) ≡
+     (tok , insert pkh (v - v) map)
+rwDatum pkh v map rewrite v-v v = refl
+\end{code}
+}
+
+
+\newcommand\mLIL{%
+\begin{code}                           
+lookupInsertLemma : ∀ (pkh : PubKeyHash) (v : Value) (map : AccMap)
+  -> lookup pkh (insert pkh v map) ≡ Just v
+lookupInsertLemma pkh v [] rewrite n=n pkh = refl
+lookupInsertLemma pkh v (x ∷ map') with pkh == x .fst in eq
+...| True rewrite n=n pkh = refl
+...| False rewrite eq = lookupInsertLemma pkh v map'
+\end{code}
+}
+
+
+
+\newcommand\mRecF{%
+\begin{code}                           
+userCanRecoverFunds :
+  ∀ {val par} (s : State) (pkh : PubKeyHash)
+  -> lookup pkh (accMap s) ≡ Just val
+  -> invariant s
+  -> ∃[ s' ] ((par ⊢ s ~[ Withdraw pkh val ]~> s')
+     × (lookup pkh (accMap s') ≡ Just emptyValue))
+\end{code}
+}
+
+\newcommand\mRecFp{%
+\begin{code}                           
+userCanRecoverFunds {val} s@record { datum = (tok , map) ; value = v}
+  pkh p1 p2 = ⟨ s' , ((TWithdraw refl refl p1
+              (geqLem map val (p2 .fst) p1)
+              (geq-refl val) (rwDatum pkh val map) refl) ,
+              lookupInsertLemma pkh emptyValue map) ⟩
+\end{code}
+}
+
+\newcommand\mRecFs{%
+\begin{code}                           
+  where
+  s' = record
+        { datum = tok , (insert pkh emptyValue map)
+        ; value = v - val
+        ; tsig = pkh
+        ; spends = 0
+        ; threadTokCS = 0
+        }
+\end{code}
+}
+
+
+
+
+
+\newcommand\mDF{%
+\begin{code}
+deadlockFreedom : ∀ (s : State) (par : MParams)
+          -> invariant s
+          -> ∃[ s' ] ∃[ i ] ((par ⊢ s ~[ i ]~> s') ⊎ (par ⊢ s ~[ i ]~| s'))
+\end{code}
+}
+
+\newcommand\mDFp{%
+\begin{code}
+deadlockFreedom record { datum = (tok , []) } par (p1 , p2)
+  = ⟨ s1 , ⟨ Stop , (inj₂ (TStop refl)) ⟩ ⟩
+  where
+  s1 = record
+        { datum = tok , [] ;
+        value = emptyValue ;
+        tsig = 0 ;
+        spends = 0 ;
+        threadTokCS = 0 }
+deadlockFreedom s@record { datum = (tok , (pkh , v) ∷ map) } par (p1 , p2)
+  = ⟨ s2 , ⟨ Deposit pkh 2 , inj₁ (TDeposit refl refl (rwLookup (n=n pkh)) refl (rwInsertDelete (n=n pkh) refl) refl) ⟩ ⟩
+  where
+  s2 = record
+        { datum = tok , (pkh , v + 2) ∷ map ;
+        value = s .value + 2 ;
+        tsig = pkh ;
+        spends = 0 ;
+        threadTokCS = 0 }
+\end{code}
+}
+
+
+
+
+\begin{code}[hide]
+
+-- Multi-Step transition lemma
+lemmaMultiStep : ∀ (s s' s'' : State) (is is' : List Redeemer) {par}
+                   -> par ⊢  s  ~[ is  ]~* s'
+                   -> par ⊢ s' ~[ is' ]~* s''
+                   -> par ⊢ s  ~[ is ++ is' ]~* s''
+lemmaMultiStep s .s s'' [] is' nil p2 = p2
+lemmaMultiStep s s' s'' (x ∷ is) is' (cons {s' = s'''} p1 p2) p3
+  = cons p1 (lemmaMultiStep s''' s' s'' is is' p2 p3)
+
+
+
+
+
+targetStateRewrite : ∀ {spn tokCS} (par : MParams)
+                     (s s' : State) (i : Redeemer)
                  -> par ⊢ s ~[ i ]~> s'
                  -> par ⊢ s ~[ i ]~> record
                                       { datum = datum s'
@@ -970,75 +1128,13 @@ targetStateRewrite par s s' i (TTransfer x x₁ x₂ x₃ x₄ x₅ x₆ x₇ x�
   = TTransfer x x₁ x₂ x₃ x₄ x₅ x₆ x₇ x₈
 
 
-rwDatum : ∀ {tok : AssetClass} (pkh : PubKeyHash) (v : Value) (map : AccMap)
-  -> (tok , insert pkh emptyValue map) ≡
-     (tok , insert pkh (v - v) map)
-rwDatum pkh v map rewrite v-v v = refl
 
 
-lookupInsertLemma : ∀ (pkh : PubKeyHash) (v : Value) (map : AccMap)
-  -> lookup pkh (insert pkh v map) ≡ Just v
-lookupInsertLemma pkh v [] rewrite n=n pkh = refl
-lookupInsertLemma pkh v (x ∷ map) with pkh == x .fst in eq
-...| True rewrite n=n pkh = refl
-...| False rewrite eq = lookupInsertLemma pkh v map
 
-userCanRecoverFunds :
-  ∀ {val par} (s : State) (pkh : PubKeyHash)
-  -> lookup pkh (accMap s) ≡ Just val
-  -> invariant s
-  -> ∃[ s' ] ((par ⊢ s ~[ [ Withdraw pkh val ] ]~* s')
-     × (lookup pkh (accMap s') ≡ Just emptyValue))
-     
-userCanRecoverFunds {val} s@record { datum = (tok , map) ; value = v}
-  pkh p1 p2 = ⟨ s' , (cons {s' = s'} (TWithdraw refl refl p1
-              (geqLem map val (p2 .fst) p1)
-              (geq-refl val) (rwDatum pkh val map) refl)
-              nil , lookupInsertLemma pkh emptyValue map) ⟩
-  where
-  s' = record
-        { datum = tok , (insert pkh emptyValue map)
-        ; value = v - val
-        ; tsig = pkh
-        ; spends = 0
-        ; threadTokCS = 0
-        }
+--(TWithdraw refl refl (rwLookup (n=n pkh))
+ --       (getGeq map' p) (geq-refl v) (rwInsertDelete (n=n pkh)
+   --     (rwAccMap pkh v map')) (rwVal (value st) v)) 
 
-
-skipInsert : ∀ {val} (pkh1 pkh2 : PubKeyHash) (map : AccMap)
-             -> pkh1 ≢ pkh2
-             -> lookup pkh2 map ≡ lookup pkh2 (insert pkh1 val map)
-             
-skipInsert pkh1 pkh2 [] p with pkh2 == pkh1 in eq
-...| True = ⊥-elim (p (sym (==to≡ pkh2 pkh1 eq)))
-...| False = refl
-skipInsert pkh1 pkh2 (x ∷ map') p with pkh2 == (x .fst) in eq1
-skipInsert pkh1 pkh2 (x ∷ map') p | True with pkh1 == (x .fst) in eq2
-skipInsert pkh1 pkh2 (x ∷ map') p | True | True
-  rewrite ==to≡ pkh2 (x .fst) eq1 | ==to≡ pkh1 (x .fst) eq2 = ⊥-elim (p refl)
-skipInsert pkh1 pkh2 (x ∷ map') p | True | False rewrite eq1 = refl
-skipInsert pkh1 pkh2 (x ∷ map') p | False with pkh1 == (x .fst) in eq2
-skipInsert pkh1 pkh2 (x ∷ map') p | False | True 
-  rewrite sym (==to≡ pkh1 (x .fst) eq2) | eq1 = refl
-skipInsert pkh1 pkh2 (x ∷ map') p | False | False rewrite eq1
-  = skipInsert pkh1 pkh2 map' p
-
-
-otherAccountsUnaffectedW :
-  ∀ {val} (s s' : State) (par : MParams) (pkh1 pkh2 : PubKeyHash)
-  -> par ⊢ s ~[ Withdraw pkh1 val ]~> s'
-  -> pkh1 ≢ pkh2
-  -> lookup pkh2 (accMap s) ≡ lookup pkh2 (accMap s')
-otherAccountsUnaffectedW record {datum = (tok , map)} s' par pkh1 pkh2
-  (TWithdraw refl refl c d e refl refl) p2 = skipInsert pkh1 pkh2 map p2
-
-otherAccountsUnaffectedD :
-  ∀ {val} (s s' : State) (par : MParams) (pkh1 pkh2 : PubKeyHash)
-  -> par ⊢ s ~[ Deposit pkh1 val ]~> s'
-  -> pkh1 ≢ pkh2
-  -> lookup pkh2 (accMap s) ≡ lookup pkh2 (accMap s')
-otherAccountsUnaffectedD record {datum = (tok , map)} s' par pkh1 pkh2
-  (TDeposit refl refl c d refl refl) p2 = skipInsert pkh1 pkh2 map p2
 
 
 

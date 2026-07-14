@@ -1,7 +1,7 @@
 \begin{code}
 open import Validators.DEx3
-open import Lib'
-open import Value'
+open import Lib
+open import Value
 
 open import Agda.Builtin.Char
 open import Agda.Builtin.Equality
@@ -29,7 +29,7 @@ open import Haskell.Prim.Ord using (_<=_ ; _>=_)
 open import Haskell.Prim using (lengthNat)
 open import Haskell.Prelude using (lookup ; _+_ ; _-_)
 
-open import ProofLib'
+open import ProofLib
 
 module Proofs.DExProofs3 where
 
@@ -464,3 +464,29 @@ onlyOwnerCanStop par s s' p1 ()
 
 
 \end{code}
+
+
+
+\newcommand\mDF{%
+\begin{code}
+deadlockFreedom : ∀ (s : State) (par : MParams)
+          -> valid s
+          -> ∃[ s' ] ∃[ i ] ((par ⊢ s ~[ i ]~> s') ⊎ (par ⊢ s ~[ i ]~| s'))
+\end{code}
+}
+
+\newcommand\mDFp{%
+\begin{code}
+deadlockFreedom s par p = ⟨ s' , ⟨ Stop , (inj₂ (TStop refl)) ⟩ ⟩
+  where
+  s' = record
+        { datum = (0 , 0) ,
+          record { ratio = record { num = 0 ; den = 0 } ; owner = 0 }
+        ; value = unMap []
+        ; payVal = unMap []
+        ; tsig = s .datum .snd .owner
+        ; spends = 0
+        ; token = 0 , 0
+        }
+\end{code}
+}

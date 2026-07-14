@@ -25,9 +25,9 @@ open import Haskell.Prim using (lengthNat)
 open import Haskell.Prelude using (lookup)
 open import Function.Base using (_∋_)
 
-open import Lib'
+open import Lib
 
-module ProofLib' where
+module ProofLib where
 
 --Various lemmas about the agda2hs Haskell prelude and relating it to the standard library
 

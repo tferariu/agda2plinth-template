@@ -1,7 +1,7 @@
 \begin{code}
 open import Validators.MultiSig4
-open import Lib'
-open import Value'
+open import Lib
+open import Value
 
 open import Agda.Builtin.Char
 open import Agda.Builtin.Equality
@@ -30,7 +30,7 @@ open import Haskell.Prim.Ord using (_<=_ ; _>=_)
 open import Haskell.Prim using (lengthNat)
 open import Haskell.Prelude using (lookup; _-_; _+_)
 
-open import ProofLib'
+open import ProofLib
 
 module Proofs.MultiSigProofs5 where
 
@@ -525,7 +525,7 @@ liquidity par
              { datum = tok , (Collecting (value - minValue) pkh 0 [])
              ; value = value
              ; outVal = outVal
-             ; interval = toPOSIXTime (maxWait par) , toPOSIXTime 0 --(maxWait par , 0)
+             ; interval = toPOSIXTime (maxWait par) , toPOSIXTime (maxWait par + 100) 
              ; tsig = tsig
              ; spends = spends
              ; token = token
@@ -1002,3 +1002,53 @@ onlyAuthorizedCanSign : ∀ (par : MParams) (s s' : State) (pkh : PubKeyHash)
 onlyAuthorizedCanSign par s s' pkh p1 (TAdd x x₁ x₂ x₃ x₄) = p1 x
 
 \end{code}
+
+
+\newcommand\mDF{%
+\begin{code}
+deadlockFreedom : ∀ (s : State) (par : MParams)
+          -> validS s -> validP par
+          -> ∃[ s' ] ∃[ i ] ((par ⊢ s ~[ i ]~> s') ⊎ (par ⊢ s ~[ i ]~| s'))
+\end{code}
+}
+
+\newcommand\mDFp{%
+\begin{code}
+deadlockFreedom record { datum = (tok , Holding) ; value = value} par p1 p2 with (lovelaces x2MinValue > lovelaces value) in eq
+...| true = ⟨ s1 , ⟨ Stop , (inj₂ (TStop refl eq)) ⟩ ⟩
+  where
+  s1 = record
+        { datum = (0 , 0) , Collecting 0 0 0 []
+        ; value = unMap []
+        ; outVal = unMap []
+        ; interval = (toPOSIXTime 0) , (toPOSIXTime 0)
+        ; tsig = 0
+        ; spends = 0
+        ; token = 0 , 0
+        } 
+...| false = ⟨ s2 , ⟨ (Propose (value - minValue) 1234 0)  , inj₁ (TPropose (rewriteGeq value minValue) (geqSub value minValue minValue (lovelaceLemma value (ltIntFalseToGeq (lovelaces value) (pos 6) eq))) refl refl refl (beforeLemma (maxWait par) (_×_×_.thd3 p2))) ⟩ ⟩
+  where
+  s2 = record
+        { datum = tok , Collecting (value - minValue) 1234 0 []
+        ; value = value
+        ; outVal = unMap []
+        ; interval = (toPOSIXTime (maxWait par)) , (toPOSIXTime (maxWait par + 100))
+        ; tsig = 0
+        ; spends = 0
+        ; token = 0 , 0
+        } 
+deadlockFreedom s@record { datum = (tok , Collecting v pkh d sigs) } par p1 p2 = ⟨ s2 , ⟨ Cancel , (inj₁ (TCancel (ltIntegerLemma d) refl refl refl)) ⟩ ⟩
+  where
+  s2 = record
+        { datum = tok , Holding
+        ; value = s .value
+        ; outVal = unMap []
+        ; interval = (toPOSIXTime (d + 1)) , (toPOSIXTime (d + 100))
+        ; tsig = 0
+        ; spends = 0
+        ; token = 0 , 0
+        } 
+
+\end{code}
+}
+

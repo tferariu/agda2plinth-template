@@ -2,7 +2,7 @@
 
 open import Haskell.Prelude
 
-module Lib' where
+module Lib where
 
 --Defining types that already exist in Plinth or are necessary for the abstract implementation of Value
 \end{code}

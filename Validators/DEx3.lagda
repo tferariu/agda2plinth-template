@@ -1,7 +1,7 @@
 \begin{code}
 open import Haskell.Prelude
-open import Lib'
-open import Value'
+open import Lib
+open import Value
 
 module Validators.DEx3 where
 
