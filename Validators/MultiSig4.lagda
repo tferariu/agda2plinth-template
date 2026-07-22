@@ -143,31 +143,33 @@ agdaValidator : Params -> Datum -> Redeemer -> ScriptContext -> Bool
 agdaValidator param (tok , lab) red ctx = checkTokenIn tok ctx &&
   (case (lab , red) of λ where
     (Holding , (Propose v pkh d)) ->
-      (newValue ctx == oldValue ctx) && geq (oldValue ctx) (v + minValue) &&
-      geq v minValue && notTooLate param d ctx && continuing ctx && (checkTokenOut tok ctx) &&
-      (case (newDatum ctx) of λ where
+      newValue ctx == oldValue ctx && geq (oldValue ctx) (v + minValue) &&
+      geq v minValue && notTooLate param d ctx && continuing ctx &&
+      checkTokenOut tok ctx && (case (newDatum ctx) of λ where
         (tok' , Holding) -> False
         (tok' , (Collecting v' pkh' d' sigs')) ->
           v == v' && pkh == pkh' && d == d' && sigs' == [] && tok == tok' )
     ((Collecting v pkh d sigs) , (Add sig)) ->
-      newValue ctx == oldValue ctx && checkSigned sig ctx && query sig (authSigs param) &&
-      continuing ctx && (checkTokenOut tok ctx) && (case (newDatum ctx) of λ where
+      newValue ctx == oldValue ctx && checkSigned sig ctx &&
+      query sig (authSigs param) && continuing ctx &&
+      checkTokenOut tok ctx && (case (newDatum ctx) of λ where
         (tok' , Holding) -> False
         (tok' , (Collecting v' pkh' d' sigs')) ->
-          v == v' && pkh == pkh' && d == d' && sigs' == insert sig sigs && tok == tok' )
+          v == v' && pkh == pkh' && d == d' &&
+          sigs' == insert sig sigs && tok == tok' )
     ((Collecting v pkh d sigs) , Pay) ->
-      (lengthNat sigs) >= (minSigs param) && continuing ctx && (checkTokenOut tok ctx) &&
-      (case (newDatum ctx) of λ where
-        (tok' , Holding) -> 
-          checkPayment pkh v ctx && ((newValue ctx) + v) == oldValue ctx && tok == tok'
+      (lengthNat sigs) >= (minSigs param) && continuing ctx &&
+      (checkTokenOut tok ctx) && (case (newDatum ctx) of λ where
+        (tok' , Holding) -> checkPayment pkh v ctx &&
+          ((newValue ctx) + v) == oldValue ctx && tok == tok'
         (tok' , (Collecting v' pkh' d' sigs')) -> False)
     ((Collecting v pkh d sigs) , Cancel) ->
-      newValue ctx == oldValue ctx && continuing ctx && (checkTokenOut tok ctx) &&
-      (case (newDatum ctx) of λ where
+      newValue ctx == oldValue ctx && continuing ctx &&
+      (checkTokenOut tok ctx) && (case (newDatum ctx) of λ where
         (tok' , Holding) -> expired d ctx && tok == tok'
         (tok' , (Collecting v' pkh' d' sigs')) -> False)
-    (Holding , Stop) -> lovelaces x2MinValue > lovelaces (oldValue ctx) && not (continuing ctx) &&
-                                 checkTokenBurned tok ctx
+    (Holding , Stop) -> lovelaces x2MinValue > lovelaces (oldValue ctx) &&
+      not (continuing ctx) && checkTokenBurned tok ctx
     _ -> False )
 
 
@@ -180,7 +182,8 @@ checkDatum addr tn ctx = case (newDatumAddr addr ctx) of λ where
   (tok , (Collecting _ _ _ _)) -> False
 
 checkValue : Address -> TokenName -> ScriptContext -> Bool
-checkValue addr tn ctx = geq (newValueAddr addr ctx) x2MinValue && checkTokenOutAddr addr (ownAssetClass tn ctx) ctx
+checkValue addr tn ctx = geq (newValueAddr addr ctx) x2MinValue &&
+  checkTokenOutAddr addr (ownAssetClass tn ctx) ctx
 
 notIn : PubKeyHash -> List PubKeyHash -> Bool
 notIn x [] = True
@@ -191,8 +194,8 @@ noDups [] = True
 noDups (x ∷ xs) = notIn x xs && noDups xs
 
 checkParams : Params -> Bool
-checkParams par
-  = (noDups (par .authSigs)) && (lengthNat (par .authSigs) >= par .minSigs) && par .maxWait > 0 
+checkParams par  = (noDups (par .authSigs)) &&
+  (lengthNat (par .authSigs) >= par .minSigs) && par .maxWait > 0 
 
 isInitial : Params -> Address -> TxOutRef -> TokenName -> ScriptContext -> Bool
 isInitial par addr oref tn ctx = consumes oref ctx &&
@@ -209,12 +212,13 @@ isInitial par addr oref tn ctx = consumes oref ctx &&
 {-# COMPILE AGDA2HS isInitial #-}
 
 -- The Thread Token Minting Policy
-agdaPolicy : Params -> Address -> TxOutRef -> TokenName -> ⊤ -> ScriptContext -> Bool
+agdaPolicy : Params -> Address -> TxOutRef -> TokenName ->
+  ⊤ -> ScriptContext -> Bool
 agdaPolicy par addr oref tn _ ctx =
   if      amt == 1  then continuingAddr addr ctx &&
                          isInitial par addr oref tn ctx 
   else if amt == -1 then not (continuingAddr addr ctx)
-  else False
+       else False
   where
     amt = getMintedAmount ctx
 

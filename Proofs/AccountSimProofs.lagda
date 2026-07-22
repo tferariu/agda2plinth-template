@@ -261,6 +261,13 @@ valid s = All (\y -> geq (snd y) emptyValue ≡ true) (accMap s)
 \end{code}
 }
 
+\newcommand\mValidParam{%
+\begin{code}
+validP : MParams -> Set 
+validP par = true ≡ true
+\end{code}
+}
+
 \begin{code}[hide]
 
 -- Lemmas for Validity
@@ -330,6 +337,15 @@ initialValidity : ∀ {s par}
   -> valid s 
 initialValidity {record { datum = tok , [] }}
                 (TStart refl p2 p3) = allNil
+\end{code}
+}
+
+\newcommand\mIValParam{%
+\begin{code}
+initialValidityP : ∀ {s par}
+  -> par ⊢ s
+  -> validP par 
+initialValidityP pf = refl
 \end{code}
 }
 
@@ -846,14 +862,14 @@ liqLemma s@record { datum = (tok , (pkh , v) ∷ map') }
 \newcommand\mLiq{%
 \begin{code}
 liquidity : ∀ (s : State) (par : MParams)
-          -> invariant s
+          -> invariant s -> validP par
           -> ∃[ s' ] ∃[ is ] par ⊢ s ~[ is ]~|* s'
 \end{code}
 }
 
 \newcommand\mLiqp{%
 \begin{code}
-liquidity s par (p1 , p2) rewrite iVal≡ s
+liquidity s par (p1 , p2) p3 rewrite iVal≡ s
   = ⟨ s'' , ⟨ (makeIs (accMap s) ++ [ Stop ]) ,
     (fin (liqLemma s s' refl refl refl refl p2 refl refl p1)
     (TStop refl) ) ⟩ ⟩
@@ -889,7 +905,7 @@ liquidity s par (p1 , p2) rewrite iVal≡ s
 \newcommand\mMVLiq{%
 \begin{code}
 minValLiquidity : ∀ (s : State) (par : MParams)
-          -> invariant s
+          -> invariant s -> validP par
           -> ∃[ s' ] ∃[ is ]
              ((par ⊢ s ~[ is ]~* s') ×
              (value s' ≡ (minValue + assetClassValue (threadToken s') 1)))
@@ -898,7 +914,7 @@ minValLiquidity : ∀ (s : State) (par : MParams)
 
 \newcommand\mMVLiqp{%
 \begin{code}
-minValLiquidity s par (p1 , p2) rewrite iVal≡ s
+minValLiquidity s par (p1 , p2) p3 rewrite iVal≡ s
   = ⟨ s' , ⟨ (makeIs (accMap s)) ,
     ((liqLemma s s' refl refl refl refl p2 refl refl p1) , refl) ⟩ ⟩ 
   where
@@ -1363,6 +1379,7 @@ validatorImpliesRunning :
      × checkTokenOut (d .fst) ctx ≡ true)
 \end{code}
 }
+
 
 
 \newcommand\pBIF{%
