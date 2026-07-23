@@ -1,5 +1,5 @@
 \begin{code}
-open import Validators.MultiSig4
+open import Validators.MultiSig
 open import Lib
 open import Value
 
@@ -32,7 +32,7 @@ open import Haskell.Prelude using (lookup; _-_; _+_)
 
 open import ProofLib
 
-module Proofs.MultiSigProofs5 where
+module Proofs.MultiSigProofs where
 
 -- Model and proofs for the Multi-Signature contract
 
@@ -47,7 +47,6 @@ x ∉ xs = ¬ (x ∈ xs)
 data Unique {a : Set} : List a → Set where
   root : Unique []
   _::_ : {x : a} {l : List a} -> x ∉ l -> Unique l -> Unique (x ∷ l)
-
 
 
 -- The States of the State Transition System
@@ -388,20 +387,25 @@ subset-del : ∀{x}{l1 l2 : List a} (p : x ∈ l2) -> (x ∉ l1) -> l1 ⊆ l2 ->
 subset-del p n [] = []
 subset-del p n (px ∷ su) = ∈-del p (λ e -> n (here e)) px ∷ subset-del p (λ p → n (there p)) su
 
-unique-lem : {l1 l2 : List a} -> l1 ⊆ l2 -> Unique l1 -> length l2 N.≥ length l1
+unique-lem : {l1 l2 : List a} -> l1 ⊆ l2
+  -> Unique l1 -> length l2 N.≥ length l1
 unique-lem [] root = N.z≤n
-unique-lem (px ∷ sub) (x :: un) rewrite sym (length-del px) = N.s≤s (unique-lem (subset-del px x sub) un)
+unique-lem (px ∷ sub) (x :: un)
+  rewrite sym (length-del px) = N.s≤s (unique-lem (subset-del px x sub) un)
 
-insertList-sublem : (l1 l2 : List PubKeyHash) (x : PubKeyHash) -> x ∈ l2 -> x ∈ insertList l1 l2
+insertList-sublem : (l1 l2 : List PubKeyHash) (x : PubKeyHash)
+  -> x ∈ l2 -> x ∈ insertList l1 l2
 insertList-sublem [] l x pf = pf
 insertList-sublem (y ∷ l1) l2 x pf = insertList-sublem l1 (insert y l2) x (insert-lem2 x y l2 pf)
 
 insertList-lem : (l1 l2 : List PubKeyHash) -> l1 ⊆ insertList l1 l2
 insertList-lem [] l = []
-insertList-lem (x ∷ l1) l2 = insertList-sublem l1 (insert x l2) x (insert-lem1 x l2) ∷ insertList-lem l1 (insert x l2)
+insertList-lem (x ∷ l1) l2 = insertList-sublem l1 (insert x l2) x
+  (insert-lem1 x l2) ∷ insertList-lem l1 (insert x l2)
 
 --Unique Insert Lemma
-uil : ∀ (l1 l2 : List PubKeyHash) (pf : Unique l1) -> (length (insertList l1 l2) N.≥ length l1)
+uil : ∀ (l1 l2 : List PubKeyHash) (pf : Unique l1)
+  -> (length (insertList l1 l2) N.≥ length l1)
 uil l1 l2 pf = unique-lem (insertList-lem l1 l2) pf
   
 --Multi-Step lemma
@@ -410,7 +414,8 @@ lemmaMultiStep : ∀ (par : MParams) (s s' s'' : State) (is is' : List Redeemer)
                    -> par ⊢ s' ~[ is' ]~* s''
                    -> par ⊢ s  ~[ is ++ is' ]~* s''
 lemmaMultiStep par s .s s'' [] is' nil p2 = p2
-lemmaMultiStep par s s' s'' (x ∷ is) is' (cons {s' = s'''} p1 p2) p3 = cons p1 (lemmaMultiStep par s''' s' s'' is is' p2 p3)
+lemmaMultiStep par s s' s'' (x ∷ is) is' (cons {s' = s'''} p1 p2) p3
+  = cons p1 (lemmaMultiStep par s''' s' s'' is is' p2 p3)
 
 
 --Prop2 (Can add signatures 1 by 1 and then pay)
@@ -486,14 +491,6 @@ rewriteValue' : ∀ (a b : Value)
   -> b + (a + (negValue b)) ≡ a
 rewriteValue' a b rewrite commVal b (a + (negValue b)) | rewriteValue a b  = refl
 
-{-
-minValueLemma : ∀ (v : Value)
-  -> (lovelaces x2MinValue > lovelaces v) ≡ false
-  -> (lovelaces (v - minValue) >= lovelaces minValue) ≡ true
-minValueLemma v p = {!!} -- lovelaceMinValueLemma v 6 (ltIntFalseToGeq (lovelaces v) (pos 6) p)
--}
-
---rewrite (lovelaceSumLemma v minValue) = {!!}
 
 --Liquidity (For any state that is valid and has valid parameters,
 --there exists another state and some inputs such that we can transition

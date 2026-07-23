@@ -3,16 +3,35 @@ open import Haskell.Prelude
 open import Lib
 open import Value
 
-module Validators.MultiSig4 where
+module Validators.MultiSigLatex where
 
 -- Defining the types of our Plinth Datum, referred to as Label in Agda
+
+\end{code}
+
+\newcommand\msLabel{%
+\begin{code}
 data Label : Set where
   Holding : Label
   Collecting : Value -> PubKeyHash -> Integer -> List PubKeyHash -> Label
+\end{code}
+}
+
+\begin{code}[hide]
 
 {-# COMPILE AGDA2HS Label #-}
 
+\end{code}
+
+\newcommand\msDatum{%
+\begin{code}
 Datum = (AssetClass × Label)
+\end{code}
+}
+
+\begin{code}[hide]
+
+
 
 {-# COMPILE AGDA2HS Datum #-}
 
@@ -97,16 +116,28 @@ validRange : ScriptContext -> Interval
 validRange ctx = ScriptContext.validInterval ctx
 
 -- The type of the Plinth Redeemer, referred to as Input in Agda
+\end{code}
+
+\newcommand\msRedeemer{%
+\begin{code}
 data Redeemer : Set where
   Propose : Value -> PubKeyHash -> Integer -> Redeemer
   Add     : PubKeyHash -> Redeemer
   Pay     : Redeemer
   Cancel  : Redeemer
   Stop    : Redeemer
+\end{code}
+}
+
+\begin{code}[hide]
 
 {-# COMPILE AGDA2HS Redeemer #-}
 
 -- The type of the smart contract parameters
+\end{code}
+
+\newcommand\msParams{%
+\begin{code}
 record Params : Set where
     no-eta-equality
     pattern
@@ -115,33 +146,59 @@ record Params : Set where
         minSigs : Nat
         maxWait : Integer
 open Params public
+\end{code}
+}
+
+\begin{code}[hide]
 
 {-# COMPILE AGDA2HS Params #-}
 
 -- Helper functions of the validator
-query : PubKeyHash -> List PubKeyHash -> Bool
-query pkh [] = False
-query pkh (x ∷ l') = (x == pkh) || query pkh l'
 
+
+
+
+\end{code}
+
+
+\newcommand\msInsert{%
+\begin{code}
 insert : PubKeyHash -> List PubKeyHash -> List PubKeyHash
 insert pkh [] = (pkh ∷ [])
 insert pkh (x ∷ l') = if (pkh == x)
   then (x ∷ l')
   else (x ∷ (insert pkh l'))
+\end{code}
+}
 
-{-# COMPILE AGDA2HS query #-}
-{-# COMPILE AGDA2HS insert #-}
-
+  
+\newcommand\msExpired{%
+\begin{code}
 expired : Integer -> ScriptContext -> Bool
 expired d ctx = before (record { getPOSIXTime = d }) (validRange ctx) 
+\end{code}
+}
 
+\newcommand\msNotTooLate{%
+\begin{code}
 notTooLate : Params -> Integer -> ScriptContext -> Bool
-notTooLate par d ctx = before (record { getPOSIXTime = d - (maxWait par) }) (validRange ctx)
+notTooLate par d ctx =
+  before (record { getPOSIXTime = d - (maxWait par) }) (validRange ctx)
+\end{code}
+}
 
+
+\begin{code}[hide]
+
+{-# COMPILE AGDA2HS insert #-}
 {-# COMPILE AGDA2HS expired #-}
 {-# COMPILE AGDA2HS notTooLate #-}
 
 -- The Validator
+\end{code}
+
+\newcommand\msProposeI{%
+\begin{code}
 agdaValidator : Params -> Datum -> Redeemer -> ScriptContext -> Bool
 agdaValidator param (tok , lab) red ctx = checkTokenIn tok ctx &&
   (case (lab , red) of λ where
@@ -152,78 +209,130 @@ agdaValidator param (tok , lab) red ctx = checkTokenIn tok ctx &&
         (tok' , Holding) -> False
         (tok' , (Collecting v' pkh' d' sigs')) ->
           v == v' && pkh == pkh' && d == d' && sigs' == [] && tok == tok' )
+\end{code}
+}
+
+\newcommand\msAddI{%
+\begin{code}
     ((Collecting v pkh d sigs) , (Add sig)) ->
       newValue ctx == oldValue ctx && checkSigned sig ctx &&
-      query sig (authSigs param) && continuing ctx &&
+      elem sig (authSigs param) && continuing ctx &&
       checkTokenOut tok ctx && (case (newDatum ctx) of λ where
         (tok' , Holding) -> False
         (tok' , (Collecting v' pkh' d' sigs')) ->
           v == v' && pkh == pkh' && d == d' &&
           sigs' == insert sig sigs && tok == tok' )
+\end{code}
+}
+
+\newcommand\msCancelI{%
+\begin{code}
+    ((Collecting v pkh d sigs) , Cancel) ->
+      newValue ctx == oldValue ctx && continuing ctx &&
+      (checkTokenOut tok ctx) && (case (newDatum ctx) of λ where
+        (tok' , Holding) -> expired d ctx && tok == tok'
+        (tok' , (Collecting v' pkh' d' sigs')) -> False)
+\end{code}
+}
+
+\newcommand\msPayI{%
+\begin{code}
     ((Collecting v pkh d sigs) , Pay) ->
       (lengthNat sigs) >= (minSigs param) && continuing ctx &&
       (checkTokenOut tok ctx) && (case (newDatum ctx) of λ where
         (tok' , Holding) -> checkPayment pkh v ctx &&
           ((newValue ctx) + v) == oldValue ctx && tok == tok'
         (tok' , (Collecting v' pkh' d' sigs')) -> False)
-    ((Collecting v pkh d sigs) , Cancel) ->
-      newValue ctx == oldValue ctx && continuing ctx &&
-      (checkTokenOut tok ctx) && (case (newDatum ctx) of λ where
-        (tok' , Holding) -> expired d ctx && tok == tok'
-        (tok' , (Collecting v' pkh' d' sigs')) -> False)
+\end{code}
+}
+
+\newcommand\msStopI{%
+\begin{code}
     (Holding , Stop) -> lovelaces x2MinValue > lovelaces (oldValue ctx) &&
       not (continuing ctx) && checkTokenBurned tok ctx
+\end{code}
+}
+
+\newcommand\msOtherI{%
+\begin{code}
     _ -> False )
+\end{code}
+}
+
+\begin{code}[hide]
+
 
 
 {-# COMPILE AGDA2HS agdaValidator #-}
 
 -- Helper functions of the Minting Policy Script
+
+\end{code}
+
+\newcommand\msCheckDatum{%
+\begin{code}
 checkDatum : Address -> TokenName -> ScriptContext -> Bool
 checkDatum addr tn ctx = case (newDatumAddr addr ctx) of λ where
   (tok , Holding) -> ownAssetClass tn ctx == tok
   (tok , (Collecting _ _ _ _)) -> False
+\end{code}
+}
 
+\newcommand\msCheckValue{%
+\begin{code}
 checkValue : Address -> TokenName -> ScriptContext -> Bool
 checkValue addr tn ctx = geq (newValueAddr addr ctx) x2MinValue &&
   checkTokenOutAddr addr (ownAssetClass tn ctx) ctx
+\end{code}
+}
 
-notIn : PubKeyHash -> List PubKeyHash -> Bool
-notIn x [] = True
-notIn x (y ∷ ys) = if x == y then False else notIn x ys
-
+\newcommand\msNoDups{%
+\begin{code}
 noDups : List PubKeyHash -> Bool
 noDups [] = True
-noDups (x ∷ xs) = notIn x xs && noDups xs
+noDups (x ∷ xs) = not (elem x xs) && noDups xs
+\end{code}
+}
 
+\newcommand\msCheckParams{%
+\begin{code}
 checkParams : Params -> Bool
 checkParams par  = (noDups (par .authSigs)) &&
   (lengthNat (par .authSigs) >= par .minSigs) && par .maxWait > 0 
+\end{code}
+}
 
-isInitial : Params -> Address -> TxOutRef -> TokenName -> ScriptContext -> Bool
-isInitial par addr oref tn ctx = consumes oref ctx &&
-                          checkDatum addr tn ctx &&
-                          checkValue addr tn ctx &&
-                          checkParams par
-
-
-{-# COMPILE AGDA2HS notIn #-}
-{-# COMPILE AGDA2HS noDups #-}
-{-# COMPILE AGDA2HS checkParams #-}
-{-# COMPILE AGDA2HS checkDatum #-}
-{-# COMPILE AGDA2HS checkValue #-}
-{-# COMPILE AGDA2HS isInitial #-}
-
--- The Thread Token Minting Policy
+\newcommand\msPolicy{%
+\begin{code}
 agdaPolicy : Params -> Address -> TxOutRef -> TokenName ->
   ⊤ -> ScriptContext -> Bool
 agdaPolicy par addr oref tn _ ctx =
   if      amt == 1  then continuingAddr addr ctx &&
-                         isInitial par addr oref tn ctx 
+                         consumes oref ctx &&
+                         checkDatum addr tn ctx &&
+                         checkValue addr tn ctx &&
+                         checkParams par
   else if amt == -1 then not (continuingAddr addr ctx)
        else False
   where
     amt = getMintedAmount ctx
+\end{code}
+}
+
+
+
+\begin{code}[hide]
+
+
+
+
+{-# COMPILE AGDA2HS noDups #-}
+{-# COMPILE AGDA2HS checkParams #-}
+{-# COMPILE AGDA2HS checkDatum #-}
+{-# COMPILE AGDA2HS checkValue #-}
+
+-- The Thread Token Minting Policy
+
 
 {-# COMPILE AGDA2HS agdaPolicy #-}
 

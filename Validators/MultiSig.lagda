@@ -3,7 +3,7 @@ open import Haskell.Prelude
 open import Lib
 open import Value
 
-module Validators.MultiSig4 where
+module Validators.MultiSig where
 
 -- Defining the types of our Plinth Datum, referred to as Label in Agda
 data Label : Set where
@@ -119,24 +119,20 @@ open Params public
 {-# COMPILE AGDA2HS Params #-}
 
 -- Helper functions of the validator
-query : PubKeyHash -> List PubKeyHash -> Bool
-query pkh [] = False
-query pkh (x ∷ l') = (x == pkh) || query pkh l'
-
 insert : PubKeyHash -> List PubKeyHash -> List PubKeyHash
 insert pkh [] = (pkh ∷ [])
 insert pkh (x ∷ l') = if (pkh == x)
   then (x ∷ l')
   else (x ∷ (insert pkh l'))
 
-{-# COMPILE AGDA2HS query #-}
 {-# COMPILE AGDA2HS insert #-}
 
 expired : Integer -> ScriptContext -> Bool
 expired d ctx = before (record { getPOSIXTime = d }) (validRange ctx) 
 
 notTooLate : Params -> Integer -> ScriptContext -> Bool
-notTooLate par d ctx = before (record { getPOSIXTime = d - (maxWait par) }) (validRange ctx)
+notTooLate par d ctx =
+  before (record { getPOSIXTime = d - (maxWait par) }) (validRange ctx)
 
 {-# COMPILE AGDA2HS expired #-}
 {-# COMPILE AGDA2HS notTooLate #-}
@@ -154,7 +150,7 @@ agdaValidator param (tok , lab) red ctx = checkTokenIn tok ctx &&
           v == v' && pkh == pkh' && d == d' && sigs' == [] && tok == tok' )
     ((Collecting v pkh d sigs) , (Add sig)) ->
       newValue ctx == oldValue ctx && checkSigned sig ctx &&
-      query sig (authSigs param) && continuing ctx &&
+      elem sig (authSigs param) && continuing ctx &&
       checkTokenOut tok ctx && (case (newDatum ctx) of λ where
         (tok' , Holding) -> False
         (tok' , (Collecting v' pkh' d' sigs')) ->
@@ -188,13 +184,9 @@ checkValue : Address -> TokenName -> ScriptContext -> Bool
 checkValue addr tn ctx = geq (newValueAddr addr ctx) x2MinValue &&
   checkTokenOutAddr addr (ownAssetClass tn ctx) ctx
 
-notIn : PubKeyHash -> List PubKeyHash -> Bool
-notIn x [] = True
-notIn x (y ∷ ys) = if x == y then False else notIn x ys
-
 noDups : List PubKeyHash -> Bool
 noDups [] = True
-noDups (x ∷ xs) = notIn x xs && noDups xs
+noDups (x ∷ xs) = not (elem x xs) && noDups xs
 
 checkParams : Params -> Bool
 checkParams par  = (noDups (par .authSigs)) &&
@@ -207,7 +199,6 @@ isInitial par addr oref tn ctx = consumes oref ctx &&
                           checkParams par
 
 
-{-# COMPILE AGDA2HS notIn #-}
 {-# COMPILE AGDA2HS noDups #-}
 {-# COMPILE AGDA2HS checkParams #-}
 {-# COMPILE AGDA2HS checkDatum #-}

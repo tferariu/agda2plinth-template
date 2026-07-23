@@ -1,26 +1,22 @@
 module Validators.MultiSig where
 
-import Lib (Address, AssetClass, POSIXTime, PubKeyHash, TokenName, TxOutRef)
+import Lib (Address, AssetClass, POSIXTime, PubKeyHash, TokenName, TxOutRef, before)
 import Numeric.Natural (Natural)
-import Value (2xMinValue, Value, geq, lovelaces, minValue)
+import Value (Value, geq, lovelaces, minValue, x2MinValue)
 
-data Info = Holding
-          | Collecting Value PubKeyHash Integer [PubKeyHash]
+data Label = Holding
+           | Collecting Value PubKeyHash Integer [PubKeyHash]
 
-type Label = (AssetClass, Info)
+type Datum = (AssetClass, Label)
 
-data Input = Propose Value PubKeyHash Integer
-           | Add PubKeyHash
-           | Pay
-           | Cancel
-           | Close
+data Redeemer = Propose Value PubKeyHash Integer
+              | Add PubKeyHash
+              | Pay
+              | Cancel
+              | Stop
 
-data Params = Params{authSigs :: [PubKeyHash], nr :: Natural,
+data Params = Params{authSigs :: [PubKeyHash], minSigs :: Natural,
                      maxWait :: Integer}
-
-query :: PubKeyHash -> [PubKeyHash] -> Bool
-query pkh [] = False
-query pkh (x : l') = x == pkh || query pkh l'
 
 insert :: PubKeyHash -> [PubKeyHash] -> [PubKeyHash]
 insert pkh [] = [pkh]
@@ -34,75 +30,85 @@ notTooLate :: Params -> Integer -> ScriptContext -> Bool
 notTooLate par d ctx
   = before (POSIXTime (d - maxWait par)) (validRange ctx)
 
-agdaValidator :: Params -> Label -> Input -> ScriptContext -> Bool
+agdaValidator ::
+              Params -> Datum -> Redeemer -> ScriptContext -> Bool
 agdaValidator param (tok, lab) red ctx
   = checkTokenIn tok ctx &&
-      case (checkTokenOut tok ctx, lab, red) of
-          (True, Holding, Propose v pkh d) -> newValue ctx == oldValue ctx &&
-                                                geq (oldValue ctx) v &&
-                                                  lovelaces v >= lovelaces minValue &&
-                                                    notTooLate param d ctx &&
-                                                      continuing ctx &&
-                                                        case newDatum ctx of
-                                                            (tok', Holding) -> False
-                                                            (tok',
-                                                             Collecting v' pkh' d' sigs') -> v == v'
-                                                                                               &&
-                                                                                               pkh
-                                                                                                 ==
-                                                                                                 pkh'
+      case (lab, red) of
+          (Holding, Propose v pkh d) -> newValue ctx == oldValue ctx &&
+                                          geq (oldValue ctx) (v + minValue) &&
+                                            geq v minValue &&
+                                              notTooLate param d ctx &&
+                                                continuing ctx &&
+                                                  checkTokenOut tok ctx &&
+                                                    case newDatum ctx of
+                                                        (tok', Holding) -> False
+                                                        (tok', Collecting v' pkh' d' sigs') -> v ==
+                                                                                                 v'
                                                                                                  &&
-                                                                                                 d ==
-                                                                                                   d'
+                                                                                                 pkh
+                                                                                                   ==
+                                                                                                   pkh'
                                                                                                    &&
-                                                                                                   sigs'
-                                                                                                     ==
-                                                                                                     []
+                                                                                                   d ==
+                                                                                                     d'
                                                                                                      &&
-                                                                                                     tok
+                                                                                                     sigs'
                                                                                                        ==
-                                                                                                       tok'
-          (True, Collecting v pkh d sigs, Add sig) -> newValue ctx ==
-                                                        oldValue ctx
-                                                        &&
-                                                        checkSigned sig ctx &&
-                                                          query sig (authSigs param) &&
-                                                            continuing ctx &&
-                                                              case newDatum ctx of
-                                                                  (tok', Holding) -> False
-                                                                  (tok',
-                                                                   Collecting v' pkh' d'
-                                                                     sigs') -> v == v' &&
-                                                                                 pkh == pkh' &&
-                                                                                   d == d' &&
-                                                                                     sigs' ==
-                                                                                       insert sig
-                                                                                         sigs
-                                                                                       &&
-                                                                                       tok == tok'
-          (True, Collecting v pkh d sigs, Pay) -> lengthNat sigs >= nr param
-                                                    &&
-                                                    continuing ctx &&
-                                                      case newDatum ctx of
-                                                          (tok', Holding) -> checkPayment pkh v ctx
-                                                                               &&
-                                                                               oldValue ctx ==
-                                                                                 newValue ctx + v
-                                                                                 && tok == tok'
-                                                          (tok',
-                                                           Collecting v' pkh' d' sigs') -> False
-          (True, Collecting v pkh d sigs, Cancel) -> newValue ctx ==
-                                                       oldValue ctx
-                                                       &&
-                                                       continuing ctx &&
-                                                         case newDatum ctx of
-                                                             (tok', Holding) -> expired d ctx &&
-                                                                                  tok == tok'
-                                                             (tok',
-                                                              Collecting v' pkh' d' sigs') -> False
-          (False, Holding, Close) -> lovelaces 2xMinValue >
-                                       lovelaces (oldValue ctx)
-                                       && not (continuing ctx) && checkTokenBurned tok ctx
+                                                                                                       []
+                                                                                                       &&
+                                                                                                       tok
+                                                                                                         ==
+                                                                                                         tok'
+          (Collecting v pkh d sigs, Add sig) -> newValue ctx == oldValue ctx
+                                                  &&
+                                                  checkSigned sig ctx &&
+                                                    elem sig (authSigs param) &&
+                                                      continuing ctx &&
+                                                        checkTokenOut tok ctx &&
+                                                          case newDatum ctx of
+                                                              (tok', Holding) -> False
+                                                              (tok',
+                                                               Collecting v' pkh' d' sigs') -> v ==
+                                                                                                 v'
+                                                                                                 &&
+                                                                                                 pkh
+                                                                                                   ==
+                                                                                                   pkh'
+                                                                                                   &&
+                                                                                                   d ==
+                                                                                                     d'
+                                                                                                     &&
+                                                                                                     sigs'
+                                                                                                       ==
+                                                                                                       insert
+                                                                                                         sig
+                                                                                                         sigs
+                                                                                                       &&
+                                                                                                       tok
+                                                                                                         ==
+                                                                                                         tok'
+          (Collecting v pkh d sigs, Pay) -> lengthNat sigs >= minSigs param
+                                              &&
+                                              continuing ctx &&
+                                                checkTokenOut tok ctx &&
+                                                  case newDatum ctx of
+                                                      (tok', Holding) -> checkPayment pkh v ctx &&
+                                                                           newValue ctx + v ==
+                                                                             oldValue ctx
+                                                                             && tok == tok'
+                                                      (tok', Collecting v' pkh' d' sigs') -> False
+          (Collecting v pkh d sigs, Cancel) -> newValue ctx == oldValue ctx
+                                                 &&
+                                                 continuing ctx &&
+                                                   checkTokenOut tok ctx &&
+                                                     case newDatum ctx of
+                                                         (tok', Holding) -> expired d ctx &&
+                                                                              tok == tok'
+                                                         (tok',
+                                                          Collecting v' pkh' d' sigs') -> False
+          (Holding, Stop) -> lovelaces x2MinValue > lovelaces (oldValue ctx)
+                               && not (continuing ctx) && checkTokenBurned tok ctx
           _ -> False
 
 checkDatum :: Address -> TokenName -> ScriptContext -> Bool
@@ -113,20 +119,17 @@ checkDatum addr tn ctx
 
 checkValue :: Address -> TokenName -> ScriptContext -> Bool
 checkValue addr tn ctx
-  = lovelaces 2xMinValue < lovelaces (newValueAddr addr ctx) &&
+  = geq (newValueAddr addr ctx) x2MinValue &&
       checkTokenOutAddr addr (ownAssetClass tn ctx) ctx
-
-notIn :: PubKeyHash -> [PubKeyHash] -> Bool
-notIn x [] = True
-notIn x (y : ys) = if x == y then False else notIn x ys
 
 noDups :: [PubKeyHash] -> Bool
 noDups [] = True
-noDups (x : xs) = notIn x xs && noDups xs
+noDups (x : xs) = not (elem x xs) && noDups xs
 
 checkParams :: Params -> Bool
-checkParams (Params authSigs nr maxWait)
-  = noDups authSigs && lengthNat authSigs >= nr && maxWait > 0
+checkParams par
+  = noDups (authSigs par) &&
+      lengthNat (authSigs par) >= minSigs par && maxWait par > 0
 
 isInitial ::
           Params -> Address -> TxOutRef -> TokenName -> ScriptContext -> Bool

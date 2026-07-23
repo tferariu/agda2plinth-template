@@ -3,7 +3,7 @@ open import Haskell.Prelude
 open import Lib
 open import Value
 
-module Validators.MultiSig4 where
+module Validators.MultiSig where
 
 -- Defining the types of our Plinth Datum, referred to as Label in Agda
 data Label : Set where
@@ -136,7 +136,8 @@ expired : Integer -> ScriptContext -> Bool
 expired d ctx = before (record { getPOSIXTime = d }) (validRange ctx) 
 
 notTooLate : Params -> Integer -> ScriptContext -> Bool
-notTooLate par d ctx = before (record { getPOSIXTime = d - (maxWait par) }) (validRange ctx)
+notTooLate par d ctx =
+  before (record { getPOSIXTime = d - (maxWait par) }) (validRange ctx)
 
 {-# COMPILE AGDA2HS expired #-}
 {-# COMPILE AGDA2HS notTooLate #-}

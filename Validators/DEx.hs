@@ -1,20 +1,20 @@
 module Validators.DEx where
 
 import Lib (Address, AssetClass, PubKeyHash, Rational, TokenName, TxOutRef, denominator, numerator)
-import Value (Value, assetClassValue, assetClassValueOf, checkMinValue)
+import Value (Value, assetClassValue, assetClassValueOf, geq, minValue)
 
-data Info = Info{ratio :: Rational, owner :: PubKeyHash}
+data Label = Label{ratio :: Rational, owner :: PubKeyHash}
 
-type Label = (AssetClass, Info)
+type Datum = (AssetClass, Label)
 
-data Input = Update Value Rational
-           | Exchange Integer PubKeyHash
-           | Close
+data Redeemer = Update Value Rational
+              | Exchange Integer PubKeyHash
+              | Stop
 
-data Params = Params{sellC :: AssetClass, buyC :: AssetClass}
+data Params = Params{sellCurr :: AssetClass, buyCurr :: AssetClass}
 
 checkRational :: Rational -> Bool
-checkRational r = numerator r >= 0 && denominator r > 0
+checkRational r = numerator r > 0 && denominator r > 0
 
 ratioCompare :: Integer -> Integer -> Rational -> Bool
 ratioCompare a b r = a * numerator r <= b * denominator r
@@ -24,28 +24,28 @@ checkPaymentRatio ::
                     Integer -> AssetClass -> Rational -> ScriptContext -> Bool
 checkPaymentRatio pkh amt ac r ctx
   = ratioCompare amt (assetClassValueOf (getPayment pkh ctx) ac) r &&
-      checkMinValue (getPayment pkh ctx)
+      geq (getPayment pkh ctx) minValue
 
-agdaValidator :: Params -> Label -> Input -> ScriptContext -> Bool
+agdaValidator ::
+              Params -> Datum -> Redeemer -> ScriptContext -> Bool
 agdaValidator par (tok, lab) red ctx
   = checkTokenIn tok ctx &&
       case red of
           Update v r -> checkSigned (owner lab) ctx &&
                           checkRational r &&
-                            checkMinValue v &&
+                            geq v minValue &&
                               newValue ctx == v &&
-                                newDatum ctx == (tok, Info r (owner lab)) &&
+                                newDatum ctx == (tok, Label r (owner lab)) &&
                                   continuing ctx && checkTokenOut tok ctx
-          Exchange amt pkh -> oldValue ctx ==
-                                newValue ctx + assetClassValue (sellC par) amt
+          Exchange amt pkh -> newValue ctx +
+                                assetClassValue (sellCurr par) amt
+                                == oldValue ctx
                                 &&
                                 newDatum ctx == (tok, lab) &&
-                                  checkPaymentRatio (owner lab) amt (buyC par) (ratio lab) ctx &&
+                                  checkPaymentRatio (owner lab) amt (buyCurr par) (ratio lab) ctx &&
                                     continuing ctx && checkTokenOut tok ctx
-          Close -> not (continuing ctx) &&
-                     checkTokenBurned tok ctx &&
-                       not (checkTokenOut (fst (newDatum ctx)) ctx) &&
-                         checkSigned (owner lab) ctx
+          Stop -> not (continuing ctx) &&
+                    checkTokenBurned tok ctx && checkSigned (owner lab) ctx
 
 checkDatum :: Address -> TokenName -> ScriptContext -> Bool
 checkDatum addr tn ctx

@@ -1,5 +1,5 @@
 \begin{code}
-open import Validators.MultiSig4
+open import Validators.MultiSig
 open import Lib
 open import Value
 
@@ -32,7 +32,7 @@ open import Haskell.Prelude using (lookup; _-_; _+_)
 
 open import ProofLib
 
-module Proofs.MultiSigProofs5 where
+module Proofs.MultiSigProofs where
 
 -- Model and proofs for the Multi-Signature contract
 

@@ -209,16 +209,10 @@ getS' (tok , lab) ctx = record
 getPar : Params -> TxOutRef -> TokenName -> MParams
 getPar record { sellCurr = sellC ; buyCurr = buyC } oref tn
   = record
-      { -- validatorAddress = adr --: Address
-       uniqueId         = oref --: TxOutRef
-      ; threadTokName    = tn --: TokenName
-      ; sellCurr         = sellC --: AssetClass
-      ; buyCurr          = buyC }--address = adr
-                                                      --    ; outputRef = oref
-                                                      --    ; tokName = tn
-                                                      --    ; sellC = sellC
-                                                      --    ; buyC = buyC
-                                                      --    } 
+      { uniqueId         = oref
+      ; threadTokName    = tn 
+      ; sellCurr         = sellC 
+      ; buyCurr          = buyC }
 
 
 -- Lemma for validator returning true implies transition

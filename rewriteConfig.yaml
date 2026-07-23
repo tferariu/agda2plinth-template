@@ -23,8 +23,8 @@ rewrites:
     to: "checkMinValue"
   - from: "Value.lovelaces"
     to: "lovelaces"
-  - from: "Value.2xMinValue"
-    to: "2xMinValue"
+  - from: "Value.x2MinValue"
+    to: "x2MinValue"
     
   - from: "Lib.CurrencySymbol"
     to: "CurrencySymbol"    
@@ -46,6 +46,10 @@ rewrites:
     to: "denominator"
   - from: "Lib.POSIXTime"
     to: "POSIXTime"
+  - from: "Lib.before"
+    to: "before"
+  - from: "Lib.after"
+    to: "after"
 
   - from: "Validators.AccountSim.ScriptContext"
     to: "ScriptContext"
@@ -196,6 +200,8 @@ rewrites:
     to: "newValueAddr"
   - from: "Validators.MultiSig.checkTokenOutAddr"
     to: "checkTokenOutAddr"
+  - from: "Validators.MultiSig.x2MinValue"
+    to: "x2MinValue"
   
   
   - from: "Validators.DEx.ScriptContext"

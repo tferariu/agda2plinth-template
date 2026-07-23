@@ -1,5 +1,5 @@
 \begin{code}
-open import Validators.MultiSig4
+open import Validators.MultiSig
 open import Lib
 open import Value
 
@@ -26,16 +26,16 @@ open import Haskell.Prim.Eq
 open import Haskell.Prim.Ord
 open import Haskell.Prim.Maybe
 open import Haskell.Prim.Tuple
+open import Haskell.Prim.Foldable using (elem)
 open import Haskell.Prim.Ord using (_<=_ ; _>=_)
 open import Haskell.Prim using (lengthNat)
 open import Haskell.Prelude using (lookup; _-_; _+_)
 
 open import ProofLib
 
-module Proofs.MultiSigProofs5 where
+module Proofs.MultiSigProofs where
 
 -- Model and proofs for the Multi-Signature contract
-
 
 -- Extra definitions necessary for the model
 _∈_ : ∀ {A : Set} (x : A) (xs : List A) → Set
@@ -216,7 +216,7 @@ insertPreservesUniqueness {sig} {(x ∷ xs)} (p :: ps) with sig == x in eq
 ...| false = (λ z → p (insertPreserves∈ z eq)) :: (insertPreservesUniqueness ps)
 ...| true = p :: ps
 
-noDupsLemma : ∀ {x ys} -> notIn x ys ≡ true -> x ∉ ys
+noDupsLemma : ∀ {x : PubKeyHash} {ys : List PubKeyHash} -> not (elem x ys) ≡ true -> x ∉ ys
 noDupsLemma {x} {[]} p = λ ()
 noDupsLemma {x} {y ∷ ys} p with x == y in eq
 ...| True = ⊥-elim (get⊥ (sym p))
@@ -225,7 +225,7 @@ noDupsLemma {x} {y ∷ ys} p with x == y in eq
 noDups->Unique : ∀ (l : List PubKeyHash) -> noDups l ≡ true -> Unique l
 noDups->Unique [] p = root
 noDups->Unique (x ∷ []) p = (λ ()) :: root
-noDups->Unique (x ∷ y ∷ l) p = (noDupsLemma (get p)) :: noDups->Unique (y ∷ l) (go (notIn x (y ∷ l)) p)
+noDups->Unique (x ∷ y ∷ l) p = (noDupsLemma (get p)) :: noDups->Unique (y ∷ l) (go (not (elem x (y ∷ l))) p)
 
 --State Validity Invariants
 validStateInitial : ∀ {s par}
@@ -716,10 +716,10 @@ getPar p oref tn = record { uniqueId  = oref
                           ; maxWait = maxWait p }
 
 -- Lemma for validator returning true implies transition
-queryTo∈ : ∀ {sig sigs} -> (query sig sigs) ≡ true -> sig ∈ sigs
-queryTo∈ {sig} {x ∷ sigs} pf with orToSum (x == sig) (query sig sigs) pf
-... | inj₁ a = here (sym (==to≡ x sig a))
-... | inj₂ b = there (queryTo∈ b)
+elemTo∈ : ∀ {sig : PubKeyHash} {sigs : List PubKeyHash} -> (elem sig sigs) ≡ true -> sig ∈ sigs
+elemTo∈ {sig} {x ∷ sigs} pf with orToSum (sig == x) (elem sig sigs) pf
+... | inj₁ a = here (==to≡ sig x a)
+... | inj₂ b = there (elemTo∈ b)
 
 --Validator returning true implies that we can perform a transition
 validatorImpliesRunning : ∀ {oref tn} (par : Params)
@@ -745,17 +745,17 @@ validatorImpliesRunning par (tok , Holding) Pay ctx n pf = ⊥-elim (&&false (ch
 validatorImpliesRunning par (tok , Holding) Cancel ctx n pf = ⊥-elim (&&false (checkTokenIn tok ctx) pf)
 validatorImpliesRunning par (tok , Holding) Stop ctx refl pf = ⊥-elim (&&3false (checkTokenIn tok ctx) (lovelaces x2MinValue > lovelaces (oldValue ctx)) (not (continuing ctx)) pf)
 validatorImpliesRunning par (tok , Collecting v pkh d sigs) (Propose v' pkh' d') ctx n pf = ⊥-elim (&&false (checkTokenIn tok ctx) pf)
-validatorImpliesRunning par (tok , Collecting v pkh d sigs) (Add pkh') ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , Holding) ; signature = signature ; continues = continues } n pf = ⊥-elim (&&5false (eqValue outputVal inputVal) (pkh' == signature) (query pkh' (par .authSigs)) continues (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))
+validatorImpliesRunning par (tok , Collecting v pkh d sigs) (Add pkh') ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , Holding) ; signature = signature ; continues = continues } n pf = ⊥-elim (&&5false (eqValue outputVal inputVal) (pkh' == signature) (elem pkh' (par .authSigs)) continues (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))
 validatorImpliesRunning par (tok , Collecting v pkh d sigs) (Add sig) ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , Collecting v' pkh' d' sigs') ; signature = signature ; continues = continues } n pf
-  rewrite sym (==vto≡ v v' (get (go (checkTokenOut tok ctx) (go continues (go (query sig (authSigs par)) (go (sig == signature) (go (eqValue outputVal inputVal) (go (checkTokenIn tok ctx) pf)))))))) |
-  sym (==to≡ pkh pkh' (get (go (eqValue v v') (go (checkTokenOut tok ctx) (go continues (go (query sig (authSigs par)) (go (sig == signature) (go (eqValue outputVal inputVal) (go (checkTokenIn tok ctx) pf))))))))) |
-  sym (==ito≡ d d' (get (go (pkh == pkh') (go (eqValue v v') (go (checkTokenOut tok ctx) (go continues (go (query sig (authSigs par)) (go (sig == signature) (go (eqValue outputVal inputVal) (go (checkTokenIn tok ctx) pf)))))))))) |
-  (==lto≡ sigs' (insert sig sigs) (get (go (d == d') (go (pkh == pkh') (go (eqValue v v') (go (checkTokenOut tok ctx) (go continues (go (query sig (authSigs par)) (go (sig == signature) (go (eqValue outputVal inputVal) (go (checkTokenIn tok ctx) pf))))))))))) |
-  sym (==tto≡ tok tok' (go (sigs' == (insert sig sigs)) (go (d == d') (go (pkh == pkh') (go (eqValue v v') (go (checkTokenOut tok ctx) (go continues (go (query sig (authSigs par)) (go (sig == signature) (go (eqValue outputVal inputVal) (go (checkTokenIn tok ctx) pf)))))))))))
-  = TAdd (queryTo∈ (get (go (sig == signature) (go (outputVal == inputVal) (go (checkTokenIn tok ctx) pf)))))
+  rewrite sym (==vto≡ v v' (get (go (checkTokenOut tok ctx) (go continues (go (elem sig (authSigs par)) (go (sig == signature) (go (eqValue outputVal inputVal) (go (checkTokenIn tok ctx) pf)))))))) |
+  sym (==to≡ pkh pkh' (get (go (eqValue v v') (go (checkTokenOut tok ctx) (go continues (go (elem sig (authSigs par)) (go (sig == signature) (go (eqValue outputVal inputVal) (go (checkTokenIn tok ctx) pf))))))))) |
+  sym (==ito≡ d d' (get (go (pkh == pkh') (go (eqValue v v') (go (checkTokenOut tok ctx) (go continues (go (elem sig (authSigs par)) (go (sig == signature) (go (eqValue outputVal inputVal) (go (checkTokenIn tok ctx) pf)))))))))) |
+  (==lto≡ sigs' (insert sig sigs) (get (go (d == d') (go (pkh == pkh') (go (eqValue v v') (go (checkTokenOut tok ctx) (go continues (go (elem sig (authSigs par)) (go (sig == signature) (go (eqValue outputVal inputVal) (go (checkTokenIn tok ctx) pf))))))))))) |
+  sym (==tto≡ tok tok' (go (sigs' == (insert sig sigs)) (go (d == d') (go (pkh == pkh') (go (eqValue v v') (go (checkTokenOut tok ctx) (go continues (go (elem sig (authSigs par)) (go (sig == signature) (go (eqValue outputVal inputVal) (go (checkTokenIn tok ctx) pf)))))))))))
+  = TAdd (elemTo∈ (get (go (sig == signature) (go (outputVal == inputVal) (go (checkTokenIn tok ctx) pf)))))
   (sym (==to≡ sig signature (get (go (outputVal == inputVal) (go (checkTokenIn tok ctx) pf))))) refl refl (==vto≡ outputVal inputVal (get (go (checkTokenIn tok ctx) pf))) ,
-  get (go (query sig (authSigs par)) (go (sig == signature) (go (outputVal == inputVal) (go (checkTokenIn tok ctx) pf)))) , get pf ,
-  get (go continues (go (query sig (authSigs par)) (go (sig == signature) (go (outputVal == inputVal) (go (checkTokenIn tok ctx) pf)))))
+  get (go (elem sig (authSigs par)) (go (sig == signature) (go (outputVal == inputVal) (go (checkTokenIn tok ctx) pf)))) , get pf ,
+  get (go continues (go (elem sig (authSigs par)) (go (sig == signature) (go (outputVal == inputVal) (go (checkTokenIn tok ctx) pf)))))
 
 validatorImpliesRunning par (tok , Collecting v pkh d sigs) Pay ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , Holding) ; signature = signature ; continues = continues } n pf rewrite 
   sym (==tto≡ tok tok' (go ((outputVal + v) == inputVal) (go (checkPayment pkh v ctx)
@@ -813,7 +813,7 @@ bothImplyFinal par (tok , Holding) adr oref tn Pay ctx refl p2 = ⊥-elim (&&fal
 bothImplyFinal par (tok , Holding) adr oref tn Cancel ctx refl p2 = ⊥-elim (&&false (checkTokenIn tok ctx) (get p2))
 bothImplyFinal par dat@(tok , Holding) adr oref tn Stop ctx refl p2 = (TStop refl (get (go (checkTokenIn tok ctx) (get p2)))) , unNot (go (agdaValidator par dat Stop ctx) p2) , refl , get (get p2)
 bothImplyFinal par (tok , Collecting pkh v d sigs) adr oref tn (Propose v' pkh' d') ctx refl p2 = ⊥-elim (&&false (checkTokenIn tok ctx) (get p2))
-bothImplyFinal par (tok , Collecting pkh v d sigs) adr oref tn (Add sig) ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = false } refl p2 = ⊥-elim (get⊥ (sym (go (query sig (par .authSigs)) (go (sig == signature) (go (outputVal == inputVal) (go (checkTokenIn tok ctx) (get p2)))))))
+bothImplyFinal par (tok , Collecting pkh v d sigs) adr oref tn (Add sig) ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = outputDatum ; signature = signature ; continues = false } refl p2 = ⊥-elim (get⊥ (sym (go (elem sig (par .authSigs)) (go (sig == signature) (go (outputVal == inputVal) (go (checkTokenIn tok ctx) (get p2)))))))
 bothImplyFinal par dat@(tok , Collecting pkh v d sigs) adr oref tn i@(Add sig) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator par dat i ctx) p2)))
 bothImplyFinal par (tok , Collecting pkh v d sigs) adr oref tn Pay ctx@record { continues = false } refl p2 = ⊥-elim (get⊥ (sym (go ((lengthNat sigs) >= (minSigs par)) (go (checkTokenIn tok ctx) (get p2)))))
 bothImplyFinal par dat@(tok , Collecting pkh v d sigs) adr oref tn Pay ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator par dat Pay ctx) p2)))
@@ -824,9 +824,10 @@ bothImplyFinal par (tok , Collecting pkh v d sigs) adr oref tn Stop ctx p1 p2 = 
 
 --Lemma for transition implies validation returns true
 
-∈toQuery : ∀ {sig sigs} -> sig ∈ sigs -> (query sig sigs) ≡ true
-∈toQuery {sig} (here refl) rewrite n=n sig = refl
-∈toQuery (there pf) rewrite ∈toQuery pf = ||true
+∈toElem : ∀ {sig : PubKeyHash} {sigs : List PubKeyHash}
+  -> sig ∈ sigs -> (elem sig sigs) ≡ true
+∈toElem {sig} (here refl) rewrite n=n sig = refl
+∈toElem (there pf) rewrite ∈toElem pf = ||true
 
 -- Performing a transition implies that the validator returns true
 runningImpliesValidator : ∀ {oref tn} (par : Params) (d : Datum)
@@ -843,7 +844,7 @@ runningImpliesValidator par (tok , Holding) i ctx
 runningImpliesValidator par (tok , Collecting v pkh d sigs) i ctx
   (TAdd {sig} p1 refl refl refl refl , refl , p7 , p8)
   rewrite v=v (oldValue ctx) | v=v v | n=n pkh | i=i d | t=t tok
-    | l=l (insert sig sigs) | n=n sig | ∈toQuery p1 | p7 | p8 = refl
+    | l=l (insert sig sigs) | n=n sig | ∈toElem p1 | p7 | p8 = refl
 runningImpliesValidator par (tok , Collecting v pkh d sigs) i ctx
   (TPay p1 refl refl refl refl , refl , p7 , p8)
   rewrite v=v v | v=v ((newValue ctx) + v) | t=t tok

@@ -106,7 +106,7 @@ ownCurrencySymbol : ScriptContext -> CurrencySymbol
 ownCurrencySymbol = ScriptContext.tokCurrSymbol
 
 ownAssetClass : TokenName -> ScriptContext -> AssetClass
-ownAssetClass tn ctx = ((ScriptContext.tokCurrSymbol ctx) , tn)
+ownAssetClass tn ctx = (ownCurrencySymbol ctx , tn)
 
 checkTokenIn : AssetClass -> ScriptContext -> Bool
 checkTokenIn ac ctx = assetClassValueOf (ScriptContext.inputVal ctx) ac == 1

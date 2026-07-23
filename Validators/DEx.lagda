@@ -1,3 +1,4 @@
+\begin{code}
 open import Haskell.Prelude
 open import Lib
 open import Value
@@ -5,47 +6,45 @@ open import Value
 module Validators.DEx where
 
 -- Defining the types of our Plinth Datum, referred to as Label in Agda
-record Info : Set where
+record Label : Set where
   no-eta-equality
   pattern
   field
     ratio  : Rational
     owner  : PubKeyHash
-open Info public
+open Label public
 
-eqInfo : Info -> Info -> Bool
-eqInfo b c = (ratio b == ratio c) &&
-             (owner b == owner c)
+eqLabel : Label -> Label -> Bool
+eqLabel b c = (ratio b == ratio c) &&
+              (owner b == owner c)
 
 instance
-  iEqInfo : Eq Info
-  iEqInfo ._==_ = eqInfo
+  iEqLabel : Eq Label
+  iEqLabel ._==_ = eqLabel
 
-Label = (AssetClass × Info)
+Datum = (AssetClass × Label)
 
-{-# COMPILE AGDA2HS Info #-}
 {-# COMPILE AGDA2HS Label #-}
+{-# COMPILE AGDA2HS Datum #-}
 
 -- The abstract ScriptContext
 record ScriptContext : Set where
     field     
         inputVal      : Value
         outputVal     : Value
-        outputDatum   : Label
+        outputDatum   : Datum
         payments      : List (PubKeyHash × Value)
         signature     : PubKeyHash
         continues     : Bool
         inputRef      : TxOutRef
         mint          : Integer
         tokCurrSymbol : CurrencySymbol
-        tokenIn       : Bool
-        tokenOut      : Bool
         validInterval : Interval
 
 -- Functions equivalent to Plinth ScriptContext functions or provided by our template
 --https://plutus.cardano.intersectmbo.org/haddock/latest/plutus-ledger-api/PlutusLedgerApi-V3-Data-Contexts.html#t:ScriptContext
 
-newDatum : ScriptContext -> Label
+newDatum : ScriptContext -> Datum
 newDatum ctx = ScriptContext.outputDatum ctx
 
 oldValue : ScriptContext -> Value
@@ -59,7 +58,8 @@ continuing ctx = ScriptContext.continues ctx
 
 getPayment' : PubKeyHash -> List (PubKeyHash × Value) -> Value
 getPayment' pkh [] = emptyValue
-getPayment' pkh ((pkh' , v) ∷ xs) = if pkh == pkh' then v else getPayment' pkh xs
+getPayment' pkh ((pkh' , v) ∷ xs) =
+  if pkh == pkh' then v else getPayment' pkh xs
 
 getPayment : PubKeyHash -> ScriptContext -> Value
 getPayment pkh ctx = getPayment' pkh (ScriptContext.payments ctx)
@@ -67,15 +67,18 @@ getPayment pkh ctx = getPayment' pkh (ScriptContext.payments ctx)
 getMintedAmount : ScriptContext -> Integer
 getMintedAmount ctx = ScriptContext.mint ctx 
 
+ownCurrencySymbol : ScriptContext -> CurrencySymbol
+ownCurrencySymbol = ScriptContext.tokCurrSymbol
+
 ownAssetClass : TokenName -> ScriptContext -> AssetClass
-ownAssetClass tn ctx = ((ScriptContext.tokCurrSymbol ctx) , tn)
+ownAssetClass tn ctx = (ownCurrencySymbol ctx , tn)
 
 checkTokenIn : AssetClass -> ScriptContext -> Bool
-checkTokenIn ac = ScriptContext.tokenIn
+checkTokenIn ac ctx = assetClassValueOf (ScriptContext.inputVal ctx) ac == 1
 
 checkTokenOut : AssetClass -> ScriptContext -> Bool
-checkTokenOut ac = ScriptContext.tokenOut
-        
+checkTokenOut ac ctx = assetClassValueOf (ScriptContext.outputVal ctx) ac == 1
+
 checkSigned : PubKeyHash -> ScriptContext -> Bool
 checkSigned sig ctx = sig == ScriptContext.signature ctx
 
@@ -88,7 +91,7 @@ consumes oref ctx = oref == ScriptContext.inputRef ctx
 continuingAddr : Address -> ScriptContext -> Bool
 continuingAddr addr ctx = ScriptContext.continues ctx
 
-newDatumAddr : Address -> ScriptContext -> Label
+newDatumAddr : Address -> ScriptContext -> Datum
 newDatumAddr adr ctx = newDatum ctx
 
 newValueAddr : Address -> ScriptContext -> Value
@@ -100,30 +103,24 @@ checkTokenOutAddr adr = checkTokenOut
 checkPayment : PubKeyHash -> Value -> ScriptContext -> Bool
 checkPayment pkh v ctx = getPayment pkh ctx == v
 
-before : POSIXTime -> Interval -> Bool
-before record { getPOSIXTime = time } (start , end) = time < start
-
-after : POSIXTime -> Interval -> Bool
-after record { getPOSIXTime = time } (start , end) = time > end
-
 validRange : ScriptContext -> Interval
 validRange ctx = ScriptContext.validInterval ctx
 
 -- The type of the Plinth Redeemer, referred to as Input in Agda
-data Input : Set where
-  Update   : Value -> Rational -> Input
-  Exchange : Integer -> PubKeyHash -> Input
-  Close    : Input
+data Redeemer : Set where
+  Update   : Value -> Rational -> Redeemer
+  Exchange : Integer -> PubKeyHash -> Redeemer
+  Stop     : Redeemer
 
-{-# COMPILE AGDA2HS Input #-}
+{-# COMPILE AGDA2HS Redeemer #-}
 
 -- The type of the smart contract parameters
 record Params : Set where
     no-eta-equality
     pattern
     field
-            sellC  : AssetClass
-            buyC   : AssetClass
+      sellCurr  : AssetClass
+      buyCurr  : AssetClass
 open Params public
 
 {-# COMPILE AGDA2HS Params #-}
@@ -135,28 +132,32 @@ checkRational r = (numerator r > 0) && (denominator r > 0)
 ratioCompare : Integer -> Integer -> Rational -> Bool
 ratioCompare a b r = a * (numerator r) <= b * (denominator r)
 
-checkPaymentRatio : PubKeyHash -> Integer -> AssetClass -> Rational -> ScriptContext -> Bool
-checkPaymentRatio pkh amt ac r ctx = ratioCompare amt (assetClassValueOf (getPayment pkh ctx) ac) r && checkMinValue (getPayment pkh ctx)
+checkPaymentRatio : PubKeyHash -> Integer -> AssetClass
+  -> Rational -> ScriptContext -> Bool
+checkPaymentRatio pkh amt ac r ctx =
+  ratioCompare amt (assetClassValueOf (getPayment pkh ctx) ac) r &&
+  geq (getPayment pkh ctx) minValue
 
 {-# COMPILE AGDA2HS checkRational #-}
 {-# COMPILE AGDA2HS ratioCompare #-}
 {-# COMPILE AGDA2HS checkPaymentRatio #-}
 
 -- The Validator
-agdaValidator : Params -> Label -> Input -> ScriptContext -> Bool
-agdaValidator par (tok , lab) red ctx = checkTokenIn tok ctx && (case red of λ where
-  (Update v r) -> checkSigned (owner lab) ctx &&
-                    checkRational r && checkMinValue v &&
-                    newValue ctx == v &&
-                    newDatum ctx == (tok , record {ratio = r ; owner = owner lab}) &&
-                    continuing ctx && checkTokenOut tok ctx
-  (Exchange amt pkh) -> oldValue ctx == newValue ctx + (assetClassValue (sellC par) amt) &&
-                        newDatum ctx == (tok , lab) &&
-                        checkPaymentRatio (owner lab) amt (buyC par) (ratio lab) ctx && 
-                        continuing ctx && checkTokenOut tok ctx
-  Close -> not (continuing ctx) && checkTokenBurned tok ctx &&
-           not (checkTokenOut (newDatum ctx .fst) ctx) && checkSigned (owner lab) ctx )
-           
+agdaValidator : Params -> Datum -> Redeemer -> ScriptContext -> Bool
+agdaValidator par (tok , lab) red ctx = checkTokenIn tok ctx &&
+  (case red of λ where
+    (Update v r) ->
+      checkSigned (owner lab) ctx && checkRational r && geq v minValue &&
+      newValue ctx == v && newDatum ctx == (tok , record {ratio = r ;
+      owner = owner lab}) && continuing ctx && checkTokenOut tok ctx
+    (Exchange amt pkh) ->
+      newValue ctx + (assetClassValue (sellCurr par) amt) == oldValue ctx &&
+      newDatum ctx == (tok , lab) && checkPaymentRatio (owner lab) amt
+      (buyCurr par) (ratio lab) ctx && continuing ctx && checkTokenOut tok ctx
+    Stop ->
+      not (continuing ctx) && checkTokenBurned tok ctx &&
+      checkSigned (owner lab) ctx )
+
 {-# COMPILE AGDA2HS agdaValidator #-}
 
 -- Helper functions of the Minting Policy Script
@@ -169,8 +170,8 @@ checkValue addr tn ctx = checkTokenOutAddr addr (ownAssetClass tn ctx) ctx
 
 isInitial : Address -> TxOutRef -> TokenName -> ScriptContext -> Bool
 isInitial addr oref tn ctx = consumes oref ctx &&
-                          checkDatum addr tn ctx &&
-                          checkValue addr tn ctx
+                             checkDatum addr tn ctx &&
+                             checkValue addr tn ctx
 
 
 {-# COMPILE AGDA2HS checkDatum #-}
@@ -183,7 +184,7 @@ agdaPolicy addr oref tn _ ctx =
   if      amt == 1  then continuingAddr addr ctx &&
                          isInitial addr oref tn ctx 
   else if amt == -1 then not (continuingAddr addr ctx)
-  else False
+       else False
   where
     amt = getMintedAmount ctx
 
@@ -192,3 +193,5 @@ agdaPolicy addr oref tn _ ctx =
 
 
 
+
+\end{code}

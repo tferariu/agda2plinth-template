@@ -1,40 +1,39 @@
+\begin{code}
 open import Haskell.Prelude 
 open import Lib
 open import Value
 
-module Validators.MultiSig where
+module Validators.MultiSig4 where
 
 -- Defining the types of our Plinth Datum, referred to as Label in Agda
-data Info : Set where
-  Holding : Info
-  Collecting : Value -> PubKeyHash -> Integer -> List PubKeyHash -> Info
-
-{-# COMPILE AGDA2HS Info #-}
-
-Label = (AssetClass × Info)
+data Label : Set where
+  Holding : Label
+  Collecting : Value -> PubKeyHash -> Integer -> List PubKeyHash -> Label
 
 {-# COMPILE AGDA2HS Label #-}
+
+Datum = (AssetClass × Label)
+
+{-# COMPILE AGDA2HS Datum #-}
 
 -- The abstract ScriptContext
 record ScriptContext : Set where
     field     
         inputVal      : Value
         outputVal     : Value
-        outputDatum   : Label
+        outputDatum   : Datum
         payments      : List (PubKeyHash × Value)
         signature     : PubKeyHash
         continues     : Bool
         inputRef      : TxOutRef
         mint          : Integer
         tokCurrSymbol : CurrencySymbol
-        tokenIn       : Bool
-        tokenOut      : Bool
         validInterval : Interval
 
 -- Functions equivalent to Plinth ScriptContext functions or provided by our template
 --https://plutus.cardano.intersectmbo.org/haddock/latest/plutus-ledger-api/PlutusLedgerApi-V3-Data-Contexts.html#t:ScriptContext
 
-newDatum : ScriptContext -> Label
+newDatum : ScriptContext -> Datum
 newDatum ctx = ScriptContext.outputDatum ctx
 
 oldValue : ScriptContext -> Value
@@ -56,14 +55,18 @@ getPayment pkh ctx = getPayment' pkh (ScriptContext.payments ctx)
 getMintedAmount : ScriptContext -> Integer
 getMintedAmount ctx = ScriptContext.mint ctx 
 
+ownCurrencySymbol : ScriptContext -> CurrencySymbol
+ownCurrencySymbol = ScriptContext.tokCurrSymbol
+
 ownAssetClass : TokenName -> ScriptContext -> AssetClass
-ownAssetClass tn ctx = ((ScriptContext.tokCurrSymbol ctx) , tn)
+ownAssetClass tn ctx = (ownCurrencySymbol ctx , tn)
 
 checkTokenIn : AssetClass -> ScriptContext -> Bool
-checkTokenIn ac = ScriptContext.tokenIn
+checkTokenIn ac ctx = assetClassValueOf (ScriptContext.inputVal ctx) ac == 1
+
 
 checkTokenOut : AssetClass -> ScriptContext -> Bool
-checkTokenOut ac = ScriptContext.tokenOut
+checkTokenOut ac ctx = assetClassValueOf (ScriptContext.outputVal ctx) ac == 1
         
 checkSigned : PubKeyHash -> ScriptContext -> Bool
 checkSigned sig ctx = sig == ScriptContext.signature ctx
@@ -77,7 +80,7 @@ consumes oref ctx = oref == ScriptContext.inputRef ctx
 continuingAddr : Address -> ScriptContext -> Bool
 continuingAddr addr ctx = ScriptContext.continues ctx
 
-newDatumAddr : Address -> ScriptContext -> Label
+newDatumAddr : Address -> ScriptContext -> Datum
 newDatumAddr adr ctx = newDatum ctx
 
 newValueAddr : Address -> ScriptContext -> Value
@@ -89,24 +92,19 @@ checkTokenOutAddr adr = checkTokenOut
 checkPayment : PubKeyHash -> Value -> ScriptContext -> Bool
 checkPayment pkh v ctx = getPayment pkh ctx == v
 
-before : POSIXTime -> Interval -> Bool
-before record { getPOSIXTime = time } (start , end) = time < start
-
-after : POSIXTime -> Interval -> Bool
-after record { getPOSIXTime = time } (start , end) = time > end
 
 validRange : ScriptContext -> Interval
 validRange ctx = ScriptContext.validInterval ctx
 
 -- The type of the Plinth Redeemer, referred to as Input in Agda
-data Input : Set where
-  Propose : Value -> PubKeyHash -> Integer -> Input
-  Add     : PubKeyHash -> Input
-  Pay     : Input
-  Cancel  : Input
-  Close   : Input
+data Redeemer : Set where
+  Propose : Value -> PubKeyHash -> Integer -> Redeemer
+  Add     : PubKeyHash -> Redeemer
+  Pay     : Redeemer
+  Cancel  : Redeemer
+  Stop    : Redeemer
 
-{-# COMPILE AGDA2HS Input #-}
+{-# COMPILE AGDA2HS Redeemer #-}
 
 -- The type of the smart contract parameters
 record Params : Set where
@@ -114,7 +112,7 @@ record Params : Set where
     pattern
     field
         authSigs  : List PubKeyHash
-        nr : Nat
+        minSigs : Nat
         maxWait : Integer
 open Params public
 
@@ -144,35 +142,37 @@ notTooLate par d ctx = before (record { getPOSIXTime = d - (maxWait par) }) (val
 {-# COMPILE AGDA2HS notTooLate #-}
 
 -- The Validator
-agdaValidator : Params -> Label -> Input -> ScriptContext -> Bool
+agdaValidator : Params -> Datum -> Redeemer -> ScriptContext -> Bool
 agdaValidator param (tok , lab) red ctx = checkTokenIn tok ctx &&
-  (case ((checkTokenOut tok ctx) , lab , red) of λ where
-    (True , Holding , (Propose v pkh d)) ->
-      (newValue ctx == oldValue ctx) && geq (oldValue ctx) v &&
-      lovelaces v >= lovelaces minValue && notTooLate param d ctx && continuing ctx &&
-      (case (newDatum ctx) of λ where
+  (case (lab , red) of λ where
+    (Holding , (Propose v pkh d)) ->
+      newValue ctx == oldValue ctx && geq (oldValue ctx) (v + minValue) &&
+      geq v minValue && notTooLate param d ctx && continuing ctx &&
+      checkTokenOut tok ctx && (case (newDatum ctx) of λ where
         (tok' , Holding) -> False
         (tok' , (Collecting v' pkh' d' sigs')) ->
           v == v' && pkh == pkh' && d == d' && sigs' == [] && tok == tok' )
-    (True , (Collecting v pkh d sigs) , (Add sig)) ->
-      newValue ctx == oldValue ctx && checkSigned sig ctx && query sig (authSigs param) &&
-      continuing ctx && (case (newDatum ctx) of λ where
+    ((Collecting v pkh d sigs) , (Add sig)) ->
+      newValue ctx == oldValue ctx && checkSigned sig ctx &&
+      query sig (authSigs param) && continuing ctx &&
+      checkTokenOut tok ctx && (case (newDatum ctx) of λ where
         (tok' , Holding) -> False
         (tok' , (Collecting v' pkh' d' sigs')) ->
-          v == v' && pkh == pkh' && d == d' && sigs' == insert sig sigs && tok == tok' )
-    (True , (Collecting v pkh d sigs) , Pay) ->
-      (lengthNat sigs) >= (nr param) && continuing ctx && (case (newDatum ctx) of λ where
-        (tok' , Holding) -> 
-          checkPayment pkh v ctx && oldValue ctx == ((newValue ctx) + v) &&
-          tok == tok'
+          v == v' && pkh == pkh' && d == d' &&
+          sigs' == insert sig sigs && tok == tok' )
+    ((Collecting v pkh d sigs) , Pay) ->
+      (lengthNat sigs) >= (minSigs param) && continuing ctx &&
+      (checkTokenOut tok ctx) && (case (newDatum ctx) of λ where
+        (tok' , Holding) -> checkPayment pkh v ctx &&
+          ((newValue ctx) + v) == oldValue ctx && tok == tok'
         (tok' , (Collecting v' pkh' d' sigs')) -> False)
-    (True , (Collecting v pkh d sigs) , Cancel) ->
+    ((Collecting v pkh d sigs) , Cancel) ->
       newValue ctx == oldValue ctx && continuing ctx &&
-      (case (newDatum ctx) of λ where
+      (checkTokenOut tok ctx) && (case (newDatum ctx) of λ where
         (tok' , Holding) -> expired d ctx && tok == tok'
         (tok' , (Collecting v' pkh' d' sigs')) -> False)
-    (False , Holding , Close) -> lovelaces 2xMinValue > lovelaces (oldValue ctx) && not (continuing ctx) &&
-                                 checkTokenBurned tok ctx
+    (Holding , Stop) -> lovelaces x2MinValue > lovelaces (oldValue ctx) &&
+      not (continuing ctx) && checkTokenBurned tok ctx
     _ -> False )
 
 
@@ -185,7 +185,8 @@ checkDatum addr tn ctx = case (newDatumAddr addr ctx) of λ where
   (tok , (Collecting _ _ _ _)) -> False
 
 checkValue : Address -> TokenName -> ScriptContext -> Bool
-checkValue addr tn ctx = lovelaces 2xMinValue < lovelaces (newValueAddr addr ctx) && checkTokenOutAddr addr (ownAssetClass tn ctx) ctx
+checkValue addr tn ctx = geq (newValueAddr addr ctx) x2MinValue &&
+  checkTokenOutAddr addr (ownAssetClass tn ctx) ctx
 
 notIn : PubKeyHash -> List PubKeyHash -> Bool
 notIn x [] = True
@@ -196,8 +197,8 @@ noDups [] = True
 noDups (x ∷ xs) = notIn x xs && noDups xs
 
 checkParams : Params -> Bool
-checkParams record { authSigs = authSigs ; nr = nr ; maxWait = maxWait }
-  = (noDups authSigs) && (lengthNat authSigs >= nr) && maxWait > 0 
+checkParams par  = (noDups (par .authSigs)) &&
+  (lengthNat (par .authSigs) >= par .minSigs) && par .maxWait > 0 
 
 isInitial : Params -> Address -> TxOutRef -> TokenName -> ScriptContext -> Bool
 isInitial par addr oref tn ctx = consumes oref ctx &&
@@ -214,14 +215,17 @@ isInitial par addr oref tn ctx = consumes oref ctx &&
 {-# COMPILE AGDA2HS isInitial #-}
 
 -- The Thread Token Minting Policy
-agdaPolicy : Params -> Address -> TxOutRef -> TokenName -> ⊤ -> ScriptContext -> Bool
+agdaPolicy : Params -> Address -> TxOutRef -> TokenName ->
+  ⊤ -> ScriptContext -> Bool
 agdaPolicy par addr oref tn _ ctx =
   if      amt == 1  then continuingAddr addr ctx &&
                          isInitial par addr oref tn ctx 
   else if amt == -1 then not (continuingAddr addr ctx)
-  else False
+       else False
   where
     amt = getMintedAmount ctx
 
 {-# COMPILE AGDA2HS agdaPolicy #-}
 
+
+\end{code}
