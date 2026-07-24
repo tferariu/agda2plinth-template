@@ -181,19 +181,8 @@ validP par = Unique (authSigs par) × length (authSigs par) N.≥ minSigs par ×
 invariant = valid
 
 --State Validity sub-lemmas
-diffLabels : ∀ {v pkh d sigs tok1 tok2} (dat : Datum) -> dat ≡ (tok1 , Holding)
-           -> dat ≡ (tok2 , Collecting v pkh d sigs) -> ⊥ 
-diffLabels (tok , Holding) p1 ()
-diffLabels (tok , (Collecting v pkh d sigs)) () p2
 
-sameValue : ∀ {v v' pkh pkh' d d' sigs sigs' } {tok tok' : AssetClass}
-  -> (tok , Collecting v pkh d sigs) ≡ (tok' , Collecting v' pkh' d' sigs') -> v ≡ v'
-sameValue refl = refl
-
-sameSigs : ∀ {v v' pkh pkh' d d' sigs sigs'} {tok tok' : AssetClass}
-  -> (tok , Collecting v pkh d sigs) ≡ (tok' , Collecting v' pkh' d' sigs') -> sigs ≡ sigs'
-sameSigs refl = refl
-
+--State Validity sub-lemmas
 reduce∈ : ∀ {A : Set} {x y : A} {xs} -> y ∈ (x ∷ xs) -> y ≢ x -> y ∈ xs
 reduce∈ (here px) p2 = ⊥-elim (p2 px)
 reduce∈ (there p1) p2 = p1 
@@ -244,13 +233,10 @@ validStateTransition : ∀ {s s' : State} {i par}
   -> valid s
   -> par ⊢ s ~[ i ]~> s'
   -> valid s'
-validStateTransition {s' = s'} iv (TPropose {v = v} p1 p2 p3 p4 p5 p6)
-  rewrite sym p5 = Col p4 p1 p2 root
-validStateTransition {s} (Hol pf) (TAdd p1 p2 p3 p4 p5)
-  = ⊥-elim (diffLabels (datum s) pf p3)
-validStateTransition (Col pf1 pf2 pf3 pf4) (TAdd p1 p2 p3 p4 p5) 
-                     rewrite pf1 | sameValue p3 | sym p5 | sameSigs p3
-                     = Col p4 pf2 pf3 (insertPreservesUniqueness pf4)
+validStateTransition iv (TPropose p1 p2 p3 p4 refl p6) = Col p4 p1 p2 root
+validStateTransition {s} (Hol refl) (TAdd p1 p2 () p4 p5)
+validStateTransition (Col refl pf2 pf3 pf4) (TAdd p1 refl refl refl refl)
+  = Col refl pf2 pf3 (insertPreservesUniqueness pf4)
 validStateTransition iv (TPay p1 p2 p3 p4 p5) = Hol p3 
 validStateTransition iv (TCancel p1 p2 p3 p4) = Hol p3
 
@@ -302,23 +288,25 @@ prop : ∀ {v pkh d sigs tok} (s s' : State) (par : MParams)
          -> tsig s' ≡ finalSig s (makeIs asigs'')
          -> par ⊢ s ~[ makeIs asigs'' ]~* s'
 
-prop {v} {pkh} {d} {sigs} {tok} record { datum = .(tok , Collecting v pkh d sigs) ; value = value ; outVal = outVal ; tsig = tsig ; interval = interval ; spends = spends ; threadTokCS = threadTokCS } record { datum = .(_ , Collecting v pkh d (insertList [] sigs)) ; value = .(value) ; outVal = .(outVal) ; tsig = .(finalSig (record { datum = tok , Collecting v pkh d sigs ; value = value ; outVal = outVal ; tsig = tsig ; interval = interval ; spends = spends ; threadTokCS = threadTokCS }) (makeIs [])) ; spends = .(spends) ; threadTokCS = .(threadTokCS) } record { authSigs = .(asigs1 ++ []) } .(asigs1 ++ []) asigs1 [] refl refl refl refl refl refl refl refl refl refl = nil
+prop {v} {pkh} {d} {sigs} {tok} s1 s2 par .(asigs1 ++ []) asigs1 []
+  refl refl refl refl refl refl refl refl refl refl = nil
 
-prop {v} {pkh} {d} {sigs} {tok}
-  s1@record { datum = .(tok , Collecting v pkh d sigs) ; value = value ; outVal = outVal ; tsig = tsig ; spends = spends ; threadTokCS = threadTokCS }
-  s2@record { datum = .(tok , Collecting v pkh d (insertList (x ∷ asigs2) sigs)) ; value = .(value) ; outVal = .(outVal) ; interval = interval ; tsig = .(finalSig (record { datum = _ , Collecting v pkh d sigs ; value = value ; outVal = outVal ; interval = interval ; tsig = tsig ; spends = spends ; threadTokCS = threadTokCS }) (makeIs (x ∷ asigs2))) ; spends = .(spends) ; threadTokCS = .(threadTokCS) }
-  par@record { authSigs = .(asigs1 ++ x ∷ asigs2) } .(asigs1 ++ x ∷ asigs2) asigs1 (x ∷ asigs2) refl refl refl refl refl refl refl refl refl refl
+prop {v} {pkh} {d} {sigs} {tok} s1 s2 par
+  .(asigs1 ++ x ∷ asigs2) asigs1 (x ∷ asigs2)
+  refl refl refl refl refl refl refl refl refl refl
   = cons (TAdd (∈lemma asigs1 asigs2 x) refl refl refl refl)
-    (prop s' s2 par (asigs1 ++ x ∷ asigs2) (asigs1 ++ [ x ]) asigs2 refl (appendLemma x asigs1 asigs2) refl refl refl refl refl refl refl (finalSigLemma s1 s' x asigs2 refl))
+    (prop s' s2 par (asigs1 ++ x ∷ asigs2) (asigs1 ++ [ x ]) asigs2 refl
+    (appendLemma x asigs1 asigs2) refl refl refl refl refl refl refl
+    (finalSigLemma s1 s' x asigs2 refl))
     where
       s' = record
             { datum = tok , Collecting v pkh d (insert x sigs)
-            ; value = value
-            ; outVal = outVal
-            ; interval = interval
+            ; value = s1 .value
+            ; outVal = s1 .outVal
+            ; interval = s1 .interval
             ; tsig = x
-            ; spends = spends
-            ; threadTokCS = threadTokCS
+            ; spends = s1 .spends
+            ; threadTokCS = s1 .threadTokCS
             }
 
 
@@ -388,20 +376,25 @@ subset-del : ∀{x}{l1 l2 : List a} (p : x ∈ l2) -> (x ∉ l1) -> l1 ⊆ l2 ->
 subset-del p n [] = []
 subset-del p n (px ∷ su) = ∈-del p (λ e -> n (here e)) px ∷ subset-del p (λ p → n (there p)) su
 
-unique-lem : {l1 l2 : List a} -> l1 ⊆ l2 -> Unique l1 -> length l2 N.≥ length l1
+unique-lem : {l1 l2 : List a} -> l1 ⊆ l2
+  -> Unique l1 -> length l2 N.≥ length l1
 unique-lem [] root = N.z≤n
-unique-lem (px ∷ sub) (x :: un) rewrite sym (length-del px) = N.s≤s (unique-lem (subset-del px x sub) un)
+unique-lem (px ∷ sub) (x :: un)
+  rewrite sym (length-del px) = N.s≤s (unique-lem (subset-del px x sub) un)
 
-insertList-sublem : (l1 l2 : List PubKeyHash) (x : PubKeyHash) -> x ∈ l2 -> x ∈ insertList l1 l2
+insertList-sublem : (l1 l2 : List PubKeyHash) (x : PubKeyHash)
+  -> x ∈ l2 -> x ∈ insertList l1 l2
 insertList-sublem [] l x pf = pf
 insertList-sublem (y ∷ l1) l2 x pf = insertList-sublem l1 (insert y l2) x (insert-lem2 x y l2 pf)
 
 insertList-lem : (l1 l2 : List PubKeyHash) -> l1 ⊆ insertList l1 l2
 insertList-lem [] l = []
-insertList-lem (x ∷ l1) l2 = insertList-sublem l1 (insert x l2) x (insert-lem1 x l2) ∷ insertList-lem l1 (insert x l2)
+insertList-lem (x ∷ l1) l2 = insertList-sublem l1 (insert x l2) x
+  (insert-lem1 x l2) ∷ insertList-lem l1 (insert x l2)
 
 --Unique Insert Lemma
-uil : ∀ (l1 l2 : List PubKeyHash) (pf : Unique l1) -> (length (insertList l1 l2) N.≥ length l1)
+uil : ∀ (l1 l2 : List PubKeyHash) (pf : Unique l1)
+  -> (length (insertList l1 l2) N.≥ length l1)
 uil l1 l2 pf = unique-lem (insertList-lem l1 l2) pf
   
 --Multi-Step lemma
@@ -410,11 +403,12 @@ lemmaMultiStep : ∀ (par : MParams) (s s' s'' : State) (is is' : List Redeemer)
                    -> par ⊢ s' ~[ is' ]~* s''
                    -> par ⊢ s  ~[ is ++ is' ]~* s''
 lemmaMultiStep par s .s s'' [] is' nil p2 = p2
-lemmaMultiStep par s s' s'' (x ∷ is) is' (cons {s' = s'''} p1 p2) p3 = cons p1 (lemmaMultiStep par s''' s' s'' is is' p2 p3)
+lemmaMultiStep par s s' s'' (x ∷ is) is' (cons {s' = s'''} p1 p2) p3
+  = cons p1 (lemmaMultiStep par s''' s' s'' is is' p2 p3)
 
 
---Prop2 (Can add signatures 1 by 1 and then pay)
-prop2 : ∀ { v pkh d sigs tok } (s s' : State) (par : MParams)
+--LiqLemma (Can add signatures 1 by 1 and then pay)
+liqLemma : ∀ { v pkh d sigs tok } (s s' : State) (par : MParams)
           -> valid s
           -> datum s ≡ (tok , Collecting v pkh d sigs)
           -> datum s' ≡ (tok , Holding)
@@ -424,54 +418,27 @@ prop2 : ∀ { v pkh d sigs tok } (s s' : State) (par : MParams)
           -> tsig s' ≡ pkh
           -> par ⊢ s ~[ ((makeIs (authSigs par)) ++ [ Pay ]) ]~* s'
 
-prop2 {d = d} {sigs = sigs} {tok = tok}
-  s1@record { datum = .(tok , Collecting outVal sig d sigs) ; value = .(value + outVal) ; outVal = oV ; interval = interval ; tsig = tsig ; spends = spends ; threadTokCS = threadTokCS }
-  s2@record { datum = .(tok , Holding) ; value = value ; outVal = outVal ; tsig = sig ; spends = spn ; threadTokCS = tok' } par (Col p1 p2 p3 p4) refl refl refl refl (p5 , p6 , p') refl
+liqLemma {v} {pkh} {d} {sigs} {tok}
+  s1@record { datum = .(tok , Collecting oV sig d sigs) }
+  s2@record { outVal = oV ; tsig = sig } par (Col p1 p2 p3 p4)
+  refl refl refl refl (p5 , p6 , p7) refl
   = lemmaMultiStep par s1 s' s2 (makeIs (authSigs par)) [ Pay ]
     (prop1 s1 s' par refl refl refl refl refl refl refl refl)
-    (cons (TPay (N.≤-trans p6 (uil (authSigs par) sigs p5)) refl refl refl refl) nil)
+    (cons (TPay (N.≤-trans p6 (uil (authSigs par) sigs p5))
+    refl refl refl refl) nil)
   where
     s' = record
-          { datum = tok , (Collecting outVal sig d (insertList (authSigs par) sigs)) 
-          ; value = value + outVal
-          ; outVal = oV
-          ; interval = interval
-          ; tsig = finalSig (record { datum = tok , Collecting outVal sig d sigs
-                                    ; value = value + outVal
-                                    ; outVal = oV
-                                    ; interval = interval
-                                    ; tsig = tsig
-                                    ; spends = spends
-                                    ; threadTokCS = threadTokCS })  (makeIs (authSigs par))
-          ; spends = spends
-          ; threadTokCS = threadTokCS
+          { datum = tok , (Collecting oV sig d
+                    (insertList (authSigs par) sigs)) 
+          ; value = s1 .value
+          ; outVal = s1 .outVal 
+          ; interval = s1 .interval 
+          ; tsig = finalSig s1 (makeIs (authSigs par))
+          ; spends = s1 .spends
+          ; threadTokCS = s1 .threadTokCS
           }
                                                                              
 
-takeLength : ∀ {a : Nat} {l : List PubKeyHash}
-  -> length l N.≥ a -> a N.≤ length (take a l)
-takeLength {zero} {[]} p = p
-takeLength {zero} {x ∷ l} p = N.z≤n
-takeLength {N.suc a} {x ∷ l} (N.s≤s p)= N.s≤s (takeLength p)
-
-∈take : ∀ {y : PubKeyHash} {a : Nat} {l : List PubKeyHash}
-  -> y ∈ take a l -> y ∈ l
-∈take {y} {suc a} {x ∷ l} (here px) = here px
-∈take {y} {suc a} {x ∷ l} (there p) = there (∈take p)
-
-∉take : ∀ {y : PubKeyHash} {a : Nat} {l : List PubKeyHash}
-  -> y ∉ l -> y ∉ take a l
-∉take {y} {zero} {[]} p = p
-∉take {y} {zero} {x ∷ l} p = λ ()
-∉take {y} {suc a} {[]} p = p
-∉take {y} {suc a} {x ∷ l} p = λ { (here px) → p (here px) ;
-                                  (there z) → p (there (∈take z))}
-
-takeUnique : ∀ {a : Nat} {l : List PubKeyHash} -> Unique l -> Unique (take a l)
-takeUnique {zero} {[]} p = p
-takeUnique {zero} {x ∷ l} p = root
-takeUnique {suc a} {[]} p = p
-takeUnique {suc a} {x ∷ l} (p :: ps) = ∉take p :: (takeUnique ps)
 
 rewriteValue : ∀ (a b : Value)
   -> (a + (negValue b)) + b ≡ a
@@ -486,14 +453,6 @@ rewriteValue' : ∀ (a b : Value)
   -> b + (a + (negValue b)) ≡ a
 rewriteValue' a b rewrite commVal b (a + (negValue b)) | rewriteValue a b  = refl
 
-{-
-minValueLemma : ∀ (v : Value)
-  -> (lovelaces x2MinValue > lovelaces v) ≡ false
-  -> (lovelaces (v - minValue) >= lovelaces minValue) ≡ true
-minValueLemma v p = {!!} -- lovelaceMinValueLemma v 6 (ltIntFalseToGeq (lovelaces v) (pos 6) p)
--}
-
---rewrite (lovelaceSumLemma v minValue) = {!!}
 
 --Liquidity (For any state that is valid and has valid parameters,
 --there exists another state and some inputs such that we can transition
@@ -512,16 +471,19 @@ liquidity : ∀ (par : MParams) (s : State)
           -> invariant s -> validP par
           -> ∃[ s' ] ∃[ is ] (par ⊢ s ~[ is ]~|* s')
           
-liquidity par record { datum = (tok , Holding) ; value = value ; outVal = outVal ;
-  interval = interval ; tsig = tsig ; spends = spends ; threadTokCS = threadTokCS }
-  (Hol refl) p@(p2 , p3 , p4) with (lovelaces x2MinValue > lovelaces value) in eq
+liquidity par s@record { datum = (tok , Holding) ; value = value }
+  (Hol refl) p@(p2 , p3 , p4)
+  with (lovelaces x2MinValue > lovelaces value) in eq
 ...| true = ⟨ sfin , ⟨ [ Stop ] , (fin nil (TStop refl eq)) ⟩ ⟩
-...| false = ⟨ sfin , ⟨ (((Propose (value - minValue) 0 0) ∷ ((makeIs (authSigs par)) ++ [ Pay ]) ++ [ Stop ])) ,
+...| false = ⟨ sfin , ⟨ (((Propose (value - minValue) 0 0) ∷
+             ((makeIs (authSigs par)) ++ [ Pay ]) ++ [ Stop ])) ,
              fin {s' = s''} (cons (TPropose (rewriteGeq value minValue)
-             (geqSub value minValue minValue (lovelaceLemma value (ltIntFalseToGeq (lovelaces value) (pos 6) eq)))
-             refl refl refl
-             (beforeLemma (maxWait par) p4)) (prop2 s' s'' par (Col refl (rewriteGeq value minValue) 
-             (geqSub value minValue minValue (lovelaceLemma value (ltIntFalseToGeq (lovelaces value) (pos 6) eq))) root)
+             (geqSub value minValue minValue (lovelaceLemma value
+             (ltIntFalseToGeq (lovelaces value) (pos 6) eq)))
+             refl refl refl (beforeLemma (maxWait par) p4))
+             (liqLemma s' s'' par (Col refl (rewriteGeq value minValue) 
+             (geqSub value minValue minValue (lovelaceLemma value
+             (ltIntFalseToGeq (lovelaces value) (pos 6) eq))) root)
              refl refl refl (sym (rewriteValue' value minValue)) p refl))
              (TStop refl refl) ⟩ ⟩
      where
@@ -529,31 +491,36 @@ liquidity par record { datum = (tok , Holding) ; value = value ; outVal = outVal
               { datum = tok , Holding
               ; value = minValue
               ; outVal = (value - minValue)
-              ; interval = interval
+              ; interval = (toPOSIXTime 0) , (toPOSIXTime 0) 
               ; tsig = 0
-              ; spends = spends
-              ; threadTokCS = threadTokCS
-              }
+              ; spends = 0
+              ; threadTokCS = 0 }
        s' = record
              { datum = tok , (Collecting (value - minValue) 0 0 [])
              ; value = value
-             ; outVal = outVal
-             ; interval = toPOSIXTime (maxWait par) , toPOSIXTime (maxWait par + 100) 
-             ; tsig = tsig
-             ; spends = spends
-             ; threadTokCS = threadTokCS
-             }
-liquidity par record { datum = (tok , Collecting v' pkh' d' sigs') ; value = value ;
-  outVal = outVal ; interval = interval ; tsig = tsig ; spends = spends ; threadTokCS = threadTokCS }
+             ; outVal = s .outVal
+             ; interval = toPOSIXTime (maxWait par) ,
+                          toPOSIXTime (maxWait par + 100) 
+             ; tsig = s .tsig
+             ; spends = s .spends
+             ; threadTokCS = s .threadTokCS }
+             
+liquidity par record { datum = (tok , Collecting v' pkh' d' sigs') ;
+  value = value ; outVal = outVal ; interval = interval ; tsig = tsig ;
+  spends = spends ; threadTokCS = threadTokCS }
   (Col refl p2 p3 p4) p@(p7 , p8 , p9)
-  = ⟨ sfin , ⟨ ((Cancel ∷ (Propose (value - minValue) 0 0) ∷ ((makeIs (authSigs par)) ++ [ Pay ])) ++ [ Stop ]) ,
-             fin {s' = s'''} (cons {s' = s'} (TCancel (ltIntegerLemma d') refl refl refl) (cons
-             (TPropose (rewriteGeq value minValue)
-             (geqSub value minValue minValue (geqAddTrans value v' minValue minValue p2 p3)) refl refl refl
-             (beforeLemma (maxWait par) p9)) (prop2 s'' s''' par (Col refl (rewriteGeq value minValue)
-             (geqSub value minValue minValue (geqAddTrans value v' minValue minValue p2 p3)) root)
-             refl refl refl (sym (rewriteValue' value minValue)) p refl)))
-             (TStop refl refl) ⟩ ⟩ 
+  = ⟨ sfin , ⟨ ((Cancel ∷ (Propose (value - minValue) 0 0) ∷
+    ((makeIs (authSigs par)) ++ [ Pay ])) ++ [ Stop ]) ,
+    fin {s' = s'''} (cons {s' = s'} (TCancel (ltIntegerLemma d')
+    refl refl refl) (cons (TPropose (rewriteGeq value minValue)
+    (geqSub value minValue minValue
+    (geqAddTrans value v' minValue minValue p2 p3)) refl refl refl
+    (beforeLemma (maxWait par) p9))
+    (liqLemma s'' s''' par (Col refl (rewriteGeq value minValue)
+    (geqSub value minValue minValue
+    (geqAddTrans value v' minValue minValue p2 p3)) root)
+    refl refl refl (sym (rewriteValue' value minValue)) p refl)))
+    (TStop refl refl) ⟩ ⟩ 
     where
       s''' = record
              { datum = tok , Holding
@@ -562,25 +529,25 @@ liquidity par record { datum = (tok , Collecting v' pkh' d' sigs') ; value = val
              ; interval = (toPOSIXTime 0) , (toPOSIXTime 0) 
              ; tsig = 0
              ; spends = 0
-             ; threadTokCS = threadTokCS
+             ; threadTokCS = 0
              }
       s'' = record
             { datum = tok , (Collecting (value - minValue) 0 0 [])
             ; value = value
             ; outVal = 0
-            ; interval =  toPOSIXTime (maxWait par) , toPOSIXTime 0
-            ; tsig = tsig
+            ; interval = toPOSIXTime (maxWait par) , toPOSIXTime 0
+            ; tsig = 0
             ; spends = 0
-            ; threadTokCS = threadTokCS
+            ; threadTokCS = 0
             }
       s' = record
              { datum = tok , Holding
              ; value = value
              ; outVal = 0
-             ; interval =  toPOSIXTime (d' + 1) , toPOSIXTime 0 
-             ; tsig = tsig
+             ; interval =  toPOSIXTime (d' + 1) , toPOSIXTime (d' + 100) 
+             ; tsig = 0
              ; spends = 0
-             ; threadTokCS = threadTokCS
+             ; threadTokCS = 0
              }
 
 
@@ -597,7 +564,7 @@ minValLiquidity par s@record { datum = (tok , Holding) ; value = value ; outVal 
              (cons (TPropose (rewriteGeq value minValue)
              (geqSub value minValue minValue (lovelaceLemma value (ltIntFalseToGeq (lovelaces value) (pos 6) eq)))
              refl refl refl
-             (beforeLemma (maxWait par) p4)) (prop2 s' s'' par (Col refl (rewriteGeq value minValue) 
+             (beforeLemma (maxWait par) p4)) (liqLemma s' s'' par (Col refl (rewriteGeq value minValue) 
              (geqSub value minValue minValue (lovelaceLemma value (ltIntFalseToGeq (lovelaces value) (pos 6) eq))) root)
              refl refl refl (sym (rewriteValue' value minValue)) p refl) , refl ) ⟩ ⟩
      where
@@ -626,7 +593,7 @@ minValLiquidity par record { datum = (tok , Collecting v' pkh' d' sigs') ; value
              (cons {s' = s'} (TCancel (ltIntegerLemma d') refl refl refl) (cons
              (TPropose (rewriteGeq value minValue)
              (geqSub value minValue minValue (geqAddTrans value v' minValue minValue p2 p3)) refl refl refl
-             (beforeLemma (maxWait par) p9)) (prop2 s'' s''' par (Col refl (rewriteGeq value minValue)
+             (beforeLemma (maxWait par) p9)) (liqLemma s'' s''' par (Col refl (rewriteGeq value minValue)
              (geqSub value minValue minValue (geqAddTrans value v' minValue minValue p2 p3)) root)
              refl refl refl (sym (rewriteValue' value minValue)) p refl)) , refl) ⟩ ⟩ 
     where
@@ -823,7 +790,6 @@ bothImplyFinal par (tok , Collecting pkh v d sigs) adr oref tn Stop ctx p1 p2 = 
 
 
 --Lemma for transition implies validation returns true
-
 ∈toElem : ∀ {sig : PubKeyHash} {sigs : List PubKeyHash}
   -> sig ∈ sigs -> (elem sig sigs) ≡ true
 ∈toElem {sig} (here refl) rewrite n=n sig = refl
@@ -844,7 +810,7 @@ runningImpliesValidator par (tok , Holding) i ctx
 runningImpliesValidator par (tok , Collecting v pkh d sigs) i ctx
   (TAdd {sig} p1 refl refl refl refl , refl , p7 , p8)
   rewrite v=v (oldValue ctx) | v=v v | n=n pkh | i=i d | t=t tok
-    | l=l (insert sig sigs) | n=n sig | ∈toElem p1 | p7 | p8 = refl
+    | l=l (insert sig sigs) | n=n sig | ∈toElem p1 | p7 | p8 = p8 
 runningImpliesValidator par (tok , Collecting v pkh d sigs) i ctx
   (TPay p1 refl refl refl refl , refl , p7 , p8)
   rewrite v=v v | v=v ((newValue ctx) + v) | t=t tok
@@ -1012,7 +978,7 @@ onlyAuthorizedCanSign par s s' pkh p1 (TAdd x x₁ x₂ x₃ x₄) = p1 x
 \end{code}
 
 
-\newcommand\mDF{%
+\newcommand\msDF{%
 \begin{code}
 deadlockFreedom : ∀ (s : State) (par : MParams)
           -> valid s -> validP par
@@ -1020,7 +986,7 @@ deadlockFreedom : ∀ (s : State) (par : MParams)
 \end{code}
 }
 
-\newcommand\mDFp{%
+\newcommand\msDFp{%
 \begin{code}
 deadlockFreedom record { datum = (tok , Holding) ; value = value} par p1 p2 with (lovelaces x2MinValue > lovelaces value) in eq
 ...| true = ⟨ s1 , ⟨ Stop , (inj₂ (TStop refl eq)) ⟩ ⟩

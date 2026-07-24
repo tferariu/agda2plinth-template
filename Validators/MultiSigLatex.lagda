@@ -190,7 +190,6 @@ notTooLate par d ctx =
 
 \begin{code}[hide]
 
-{-# COMPILE AGDA2HS insert #-}
 {-# COMPILE AGDA2HS expired #-}
 {-# COMPILE AGDA2HS notTooLate #-}
 
