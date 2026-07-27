@@ -168,21 +168,16 @@ checkDatum addr tn ctx = case (newDatumAddr addr ctx) of λ where
 checkValue : Address -> TokenName -> ScriptContext -> Bool
 checkValue addr tn ctx = checkTokenOutAddr addr (ownAssetClass tn ctx) ctx
 
-isInitial : Address -> TxOutRef -> TokenName -> ScriptContext -> Bool
-isInitial addr oref tn ctx = consumes oref ctx &&
-                             checkDatum addr tn ctx &&
-                             checkValue addr tn ctx
-
-
 {-# COMPILE AGDA2HS checkDatum #-}
 {-# COMPILE AGDA2HS checkValue #-}
-{-# COMPILE AGDA2HS isInitial #-}
 
 -- The Thread Token Minting Policy
 agdaPolicy : Address -> TxOutRef -> TokenName -> ⊤ -> ScriptContext -> Bool
 agdaPolicy addr oref tn _ ctx =
   if      amt == 1  then continuingAddr addr ctx &&
-                         isInitial addr oref tn ctx 
+                         consumes oref ctx &&
+                         checkDatum addr tn ctx &&
+                         checkValue addr tn ctx
   else if amt == -1 then not (continuingAddr addr ctx)
        else False
   where

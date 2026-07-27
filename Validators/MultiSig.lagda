@@ -192,25 +192,21 @@ checkParams : Params -> Bool
 checkParams par  = (noDups (par .authSigs)) &&
   (lengthNat (par .authSigs) >= par .minSigs) && par .maxWait > 0 
 
-isInitial : Params -> Address -> TxOutRef -> TokenName -> ScriptContext -> Bool
-isInitial par addr oref tn ctx = consumes oref ctx &&
-                          checkDatum addr tn ctx &&
-                          checkValue addr tn ctx &&
-                          checkParams par
-
 
 {-# COMPILE AGDA2HS noDups #-}
 {-# COMPILE AGDA2HS checkParams #-}
 {-# COMPILE AGDA2HS checkDatum #-}
 {-# COMPILE AGDA2HS checkValue #-}
-{-# COMPILE AGDA2HS isInitial #-}
 
 -- The Thread Token Minting Policy
 agdaPolicy : Params -> Address -> TxOutRef -> TokenName ->
   ⊤ -> ScriptContext -> Bool
 agdaPolicy par addr oref tn _ ctx =
   if      amt == 1  then continuingAddr addr ctx &&
-                         isInitial par addr oref tn ctx 
+                         consumes oref ctx &&
+                         checkDatum addr tn ctx &&
+                         checkValue addr tn ctx &&
+                         checkParams par
   else if amt == -1 then not (continuingAddr addr ctx)
        else False
   where

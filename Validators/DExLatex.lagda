@@ -6,6 +6,10 @@ open import Value
 module Validators.DExLatex where
 
 -- Defining the types of our Plinth Datum, referred to as Label in Agda
+\end{code}
+
+\newcommand\dexLabel{%
+\begin{code}
 record Label : Set where
   no-eta-equality
   pattern
@@ -13,16 +17,29 @@ record Label : Set where
     ratio  : Rational
     owner  : PubKeyHash
 open Label public
+\end{code}
+}
 
+\newcommand\dexInstance{%
+\begin{code}
 eqLabel : Label -> Label -> Bool
 eqLabel b c = (ratio b == ratio c) &&
               (owner b == owner c)
-
 instance
   iEqLabel : Eq Label
   iEqLabel ._==_ = eqLabel
+\end{code}
+}
 
+
+\newcommand\dexDatum{%
+\begin{code}
 Datum = (AssetClass × Label)
+\end{code}
+}
+
+\begin{code}[hide]
+
 
 {-# COMPILE AGDA2HS Label #-}
 {-# COMPILE AGDA2HS Datum #-}
@@ -106,15 +123,20 @@ checkPayment pkh v ctx = getPayment pkh ctx == v
 validRange : ScriptContext -> Interval
 validRange ctx = ScriptContext.validInterval ctx
 
--- The type of the Plinth Redeemer, referred to as Input in Agda
+-- The type of the Plinth Redeemer
+\end{code}
+
+\newcommand\dexRedeemer{%
+\begin{code}
 data Redeemer : Set where
   Update   : Value -> Rational -> Redeemer
   Exchange : Integer -> PubKeyHash -> Redeemer
   Stop     : Redeemer
+\end{code}
+}
 
-{-# COMPILE AGDA2HS Redeemer #-}
-
--- The type of the smart contract parameters
+\newcommand\dexParams{%
+\begin{code}
 record Params : Set where
     no-eta-equality
     pattern
@@ -122,27 +144,56 @@ record Params : Set where
       sellCurr  : AssetClass
       buyCurr  : AssetClass
 open Params public
+\end{code}
+}
+
+\begin{code}[hide]
+
+{-# COMPILE AGDA2HS Redeemer #-}
+
+-- The type of the smart contract parameters
 
 {-# COMPILE AGDA2HS Params #-}
 
 -- Helper functions of the validator
+\end{code}
+
+\newcommand\dexCheckRational{%
+\begin{code}
 checkRational : Rational -> Bool
 checkRational r = (numerator r > 0) && (denominator r > 0)
+\end{code}
+}
 
+\newcommand\dexRatioCompare{%
+\begin{code}
 ratioCompare : Integer -> Integer -> Rational -> Bool
 ratioCompare a b r = a * (numerator r) <= b * (denominator r)
+\end{code}
+}
 
+\newcommand\dexCheckPayment{%
+\begin{code}
 checkPaymentRatio : PubKeyHash -> Integer -> AssetClass
   -> Rational -> ScriptContext -> Bool
 checkPaymentRatio pkh amt ac r ctx =
   ratioCompare amt (assetClassValueOf (getPayment pkh ctx) ac) r &&
   geq (getPayment pkh ctx) minValue
+\end{code}
+}
+
+\begin{code}[hide]
+
 
 {-# COMPILE AGDA2HS checkRational #-}
 {-# COMPILE AGDA2HS ratioCompare #-}
 {-# COMPILE AGDA2HS checkPaymentRatio #-}
 
 -- The Validator
+\end{code}
+
+\newcommand\dexValidator{%
+\begin{code}
 agdaValidator : Params -> Datum -> Redeemer -> ScriptContext -> Bool
 agdaValidator par (tok , lab) red ctx = checkTokenIn tok ctx &&
   (case red of λ where
@@ -157,37 +208,53 @@ agdaValidator par (tok , lab) red ctx = checkTokenIn tok ctx &&
     Stop ->
       not (continuing ctx) && checkTokenBurned tok ctx &&
       checkSigned (owner lab) ctx )
+\end{code}
+}
 
-{-# COMPILE AGDA2HS agdaValidator #-}
+\begin{code}[hide]
+
+
 
 -- Helper functions of the Minting Policy Script
+\end{code}
+
+\newcommand\dexMintingChecks{%
+\begin{code}
 checkDatum : Address -> TokenName -> ScriptContext -> Bool
 checkDatum addr tn ctx = case (newDatumAddr addr ctx) of λ where
   (tok , l) -> ownAssetClass tn ctx == tok && checkRational (ratio l)
 
 checkValue : Address -> TokenName -> ScriptContext -> Bool
 checkValue addr tn ctx = checkTokenOutAddr addr (ownAssetClass tn ctx) ctx
+\end{code}
+}
 
-isInitial : Address -> TxOutRef -> TokenName -> ScriptContext -> Bool
-isInitial addr oref tn ctx = consumes oref ctx &&
-                             checkDatum addr tn ctx &&
-                             checkValue addr tn ctx
-
-
-{-# COMPILE AGDA2HS checkDatum #-}
-{-# COMPILE AGDA2HS checkValue #-}
-{-# COMPILE AGDA2HS isInitial #-}
-
--- The Thread Token Minting Policy
+\newcommand\dexPolicy{%
+\begin{code}
 agdaPolicy : Address -> TxOutRef -> TokenName -> ⊤ -> ScriptContext -> Bool
 agdaPolicy addr oref tn _ ctx =
   if      amt == 1  then continuingAddr addr ctx &&
-                         isInitial addr oref tn ctx 
+                         consumes oref ctx &&
+                         checkDatum addr tn ctx &&
+                         checkValue addr tn ctx 
   else if amt == -1 then not (continuingAddr addr ctx)
        else False
   where
     amt = getMintedAmount ctx
+\end{code}
+}
+\begin{code}[hide]
 
+
+
+
+-- The Thread Token Minting Policy
+
+
+{-# COMPILE AGDA2HS agdaValidator #-}
+
+{-# COMPILE AGDA2HS checkDatum #-}
+{-# COMPILE AGDA2HS checkValue #-}
 {-# COMPILE AGDA2HS agdaPolicy #-}
 
 

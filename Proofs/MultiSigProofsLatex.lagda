@@ -845,6 +845,10 @@ getMintS tn ctx = record
                 ; threadTokCS = ownCurrencySymbol ctx }
 
 -- Resulting State for normal transitions
+\end{code}
+
+\newcommand\msGetS{%
+\begin{code}
 getS' : Datum -> ScriptContext -> State
 getS' (tok , Holding) ctx = record
              { datum = newDatum ctx
@@ -862,6 +866,11 @@ getS' (tok , Collecting v pkh d sigs) ctx = record
              ; tsig = sig ctx
              ; spends = iRef ctx
              ; threadTokCS = 0 }
+\end{code}
+}
+
+\begin{code}[hide]
+
 
 -- Getting the Model parameters from the parameters of the validator and minting policy
 getPar : Params -> TxOutRef -> TokenName -> MParams
@@ -878,6 +887,10 @@ elemTo∈ {sig} {x ∷ sigs} pf with orToSum (sig == x) (elem sig sigs) pf
 ... | inj₂ b = there (elemTo∈ b)
 
 --Validator returning true implies that we can perform a transition
+\end{code}
+
+\newcommand\msVIR{%
+\begin{code}
 validatorImpliesRunning : ∀ {oref tn} (par : Params)
   (d : Datum) (i : Redeemer) (ctx : ScriptContext)
   -> getMintedAmount ctx ≡ 0
@@ -886,6 +899,12 @@ validatorImpliesRunning : ∀ {oref tn} (par : Params)
      × continuing ctx ≡ true
      × checkTokenIn (d .fst) ctx ≡ true
      × checkTokenOut (d .fst) ctx ≡ true)
+\end{code}
+}
+
+\begin{code}[hide]
+
+
 
 validatorImpliesRunning   par (tok , Holding) (Propose v pkh d) ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , Holding) ; continues = continues  } n pf = ⊥-elim (&&7false (checkTokenIn tok ctx) (eqValue outputVal inputVal) (geq inputVal (v + minValue)) (geq v minValue) (notTooLate par d ctx) continues (checkTokenOut tok ctx) pf)
 validatorImpliesRunning par (tok , Holding) (Propose v pkh d) ctx@record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok' , Collecting v' pkh' d' sigs) ; continues = continues } n pf
@@ -1048,8 +1067,12 @@ finalImpliesBoth par d adr oref ctx (TStop refl p2 , refl , refl , p5 )
 data Phase : Set where
   Initial  : Phase
   Running  : Phase
-  Final : Phase
+  Final    : Phase
 
+\end{code}
+
+\newcommand\msArgument{%
+\begin{code}
 record Argument : Set where
   field
     par  : Params
@@ -1060,6 +1083,10 @@ record Argument : Set where
     red  : Redeemer
     ctx  : ScriptContext 
 open Argument
+\end{code}
+}
+
+\begin{code}[hide]
 
 
 -- The equivalence relation
@@ -1159,10 +1186,19 @@ inputRewrite par s s' Pay (TPay x x₁ x₂ x₃ x₄) = TPay x x₁ x₂ x₃ x
 inputRewrite par s s' Cancel (TCancel x x₁ x₂ x₃) = TCancel x x₁ x₂ x₃
 
 
+\end{code}
+
+\newcommand\msAuthCanSign{%
+\begin{code}
 onlyAuthorizedCanSign : ∀ (par : MParams) (s s' : State) (pkh : PubKeyHash)
   -> pkh ∉ par .authSigs
   -> ¬ (par ⊢ s ~[ Add pkh ]~> s')
-onlyAuthorizedCanSign par s s' pkh p1 (TAdd x x₁ x₂ x₃ x₄) = p1 x
+onlyAuthorizedCanSign par s s' pkh pf (TAdd p1 p2 p3 p4 p5) = pf p1
+\end{code}
+}
+
+\begin{code}[hide]
+
 
 \end{code}
 

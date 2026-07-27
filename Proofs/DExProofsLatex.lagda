@@ -1,5 +1,5 @@
 \begin{code}
-open import Validators.DEx
+open import Validators.DExLatex
 open import Lib
 open import Value
 
@@ -153,13 +153,25 @@ data _⊢_~[_]~|*_ : MParams -> State -> List Redeemer -> State -> Set where
     -> par ⊢ s ~[ (is ++ [ i ]) ]~|* s''
 
 -- State Validity Predicate
+\end{code}
+
+\newcommand\dexValid{%
+\begin{code}
 valid : State -> Set 
 valid s = checkRational (ratio (snd (datum s))) ≡ true 
+\end{code}
+}
+\begin{code}[hide]
+
 
 validP : MParams -> Set
 validP par = true ≡ true
 
 --State Validity Invariant
+\end{code}
+
+\newcommand\dexValidity{%
+\begin{code}
 validStateInitial : ∀ {s par}
   -> par ⊢ s
   -> valid s
@@ -171,16 +183,23 @@ validStateTransition : ∀ {s s' : State} {i par}
   -> valid s'
 validStateTransition v (TUpdate p1 p2 refl p4 p5) = p4
 validStateTransition v (TExchange p1 refl p3 p4) = v
+\end{code}
+}
+\begin{code}[hide]
+
 
 invariant = valid
 
 --Liquidity (For any state that is valid and has valid parameters,
 --there exists another state and some inputs such that we can transition
 --there and have no value left in the contract)
+\end{code}
+
+\newcommand\dexLiquidity{%
+\begin{code}
 liquidity : ∀ (par : MParams) (s : State) 
           -> invariant s -> validP par
           -> ∃[ s' ] ∃[ is ] ((par ⊢ s ~[ is ]~|* s'))
-
 liquidity par s p1 p2 = ⟨ s' , ⟨  Stop ∷ [] , (fin nil (TStop refl)) ⟩ ⟩
   where
     s' = record
@@ -190,6 +209,11 @@ liquidity par s p1 p2 = ⟨ s' , ⟨  Stop ∷ [] , (fin nil (TStop refl)) ⟩ �
           ; tsig = owner (snd (datum s))
           ; spends = 0
           ; threadTokCS = 0 }
+\end{code}
+}
+
+\begin{code}[hide]
+
 
 
 -- Extracting the State from ScriptContext
@@ -465,15 +489,19 @@ totalEquiv = record
                { arg@record { ctx = ctx@record { mint = (negsuc (N.suc n)) } } }
                  (p1 , p2 , () , p4) } }
 
-onlyOwnerCanStop : ∀ (par : MParams) (s s' : State)
-  -> s' .tsig ≢ s .datum .snd .owner
-  -> ¬ (par ⊢ s ~[ Stop ]~> s')
-onlyOwnerCanStop par s s' p1 ()
+
 
 
 \end{code}
 
-
+\newcommand\dexOwnerCanStop{%
+\begin{code}
+onlyOwnerCanStop : ∀ (par : MParams) (s s' : State)
+  -> s' .tsig ≢ s .datum .snd .owner
+  -> ¬ (par ⊢ s ~[ Stop ]~> s')
+onlyOwnerCanStop par s s' p1 ()
+\end{code}
+}
 
 \newcommand\mDF{%
 \begin{code}

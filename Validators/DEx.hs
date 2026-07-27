@@ -56,18 +56,14 @@ checkValue :: Address -> TokenName -> ScriptContext -> Bool
 checkValue addr tn ctx
   = checkTokenOutAddr addr (ownAssetClass tn ctx) ctx
 
-isInitial ::
-          Address -> TxOutRef -> TokenName -> ScriptContext -> Bool
-isInitial addr oref tn ctx
-  = consumes oref ctx &&
-      checkDatum addr tn ctx && checkValue addr tn ctx
-
 agdaPolicy ::
            Address -> TxOutRef -> TokenName -> () -> ScriptContext -> Bool
 agdaPolicy addr oref tn _ ctx
   = if amt == 1 then
-      continuingAddr addr ctx && isInitial addr oref tn ctx else
-      if amt == (-1) then not (continuingAddr addr ctx) else False
+      continuingAddr addr ctx &&
+        consumes oref ctx &&
+          checkDatum addr tn ctx && checkValue addr tn ctx
+      else if amt == (-1) then not (continuingAddr addr ctx) else False
   where
     amt :: Integer
     amt = getMintedAmount ctx
