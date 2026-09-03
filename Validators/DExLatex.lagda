@@ -1,4 +1,4 @@
-\begin{code}
+\begin{code}[hide]
 open import Haskell.Prelude
 open import Lib
 open import Value
@@ -28,6 +28,9 @@ eqLabel b c = (ratio b == ratio c) &&
 instance
   iEqLabel : Eq Label
   iEqLabel ._==_ = eqLabel
+
+{-# COMPILE AGDA2HS eqLabel #-}
+{-# COMPILE AGDA2HS iEqLabel #-}
 \end{code}
 }
 
@@ -40,7 +43,8 @@ Datum = (AssetClass × Label)
 
 \begin{code}[hide]
 
-
+{-# COMPILE AGDA2HS eqLabel #-}
+{-# COMPILE AGDA2HS iEqLabel #-}
 {-# COMPILE AGDA2HS Label #-}
 {-# COMPILE AGDA2HS Datum #-}
 
@@ -168,7 +172,7 @@ checkRational r = (numerator r > 0) && (denominator r > 0)
 \newcommand\dexRatioCompare{%
 \begin{code}
 ratioCompare : Integer -> Integer -> Rational -> Bool
-ratioCompare a b r = a * (numerator r) <= b * (denominator r)
+ratioCompare amt pay r = amt * (numerator r) <= pay * (denominator r)
 \end{code}
 }
 
@@ -231,8 +235,9 @@ checkValue addr tn ctx = checkTokenOutAddr addr (ownAssetClass tn ctx) ctx
 
 \newcommand\dexPolicy{%
 \begin{code}
-agdaPolicy : Address -> TxOutRef -> TokenName -> ⊤ -> ScriptContext -> Bool
-agdaPolicy addr oref tn _ ctx =
+agdaPolicy : Params -> Address -> TxOutRef -> TokenName ->
+  ⊤ -> ScriptContext -> Bool
+agdaPolicy par addr oref tn _ ctx =
   if      amt == 1  then continuingAddr addr ctx &&
                          consumes oref ctx &&
                          checkDatum addr tn ctx &&

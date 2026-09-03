@@ -3,9 +3,9 @@ module Validators.AccountSim where
 import Lib (Address, AssetClass, PubKeyHash, TokenName, TxOutRef)
 import Value (Value, assetClassValue, emptyValue, geq, minValue)
 
-type AccMap = [(PubKeyHash, Value)]
+type Label = [(PubKeyHash, Value)]
 
-type Datum = (AssetClass, AccMap)
+type Datum = (AssetClass, Label)
 
 data Redeemer = Open PubKeyHash
               | Close PubKeyHash
@@ -14,20 +14,22 @@ data Redeemer = Open PubKeyHash
               | Transfer PubKeyHash PubKeyHash Value
               | Stop
 
-insert :: PubKeyHash -> Value -> AccMap -> AccMap
+insert :: PubKeyHash -> Value -> Label -> Label
 insert pkh val [] = [(pkh, val)]
 insert pkh val ((x, y) : xs)
   = if pkh == x then (pkh, val) : xs else (x, y) : insert pkh val xs
 
-delete :: PubKeyHash -> AccMap -> AccMap
+delete :: PubKeyHash -> Label -> Label
 delete pkh [] = []
 delete pkh ((x, y) : xs)
   = if pkh == x then xs else (x, y) : delete pkh xs
 
-lookup :: PubKeyHash -> AccMap -> Maybe Value
+lookup :: PubKeyHash -> Label -> Maybe Value
 lookup pkh [] = Nothing
 lookup pkh ((x, y) : xs)
   = if pkh == x then Just y else lookup pkh xs
+
+type Params = ()
 
 checkEmpty :: Maybe Value -> Bool
 checkEmpty Nothing = False
@@ -36,7 +38,7 @@ checkEmpty (Just v) = v == emptyValue
 checkWithdraw ::
               AssetClass ->
                 Maybe Value ->
-                  PubKeyHash -> Value -> AccMap -> ScriptContext -> Bool
+                  PubKeyHash -> Value -> Label -> ScriptContext -> Bool
 checkWithdraw tok Nothing _ _ _ _ = False
 checkWithdraw tok (Just v) pkh val map ctx
   = geq val emptyValue &&
@@ -45,7 +47,7 @@ checkWithdraw tok (Just v) pkh val map ctx
 checkDeposit ::
              AssetClass ->
                Maybe Value ->
-                 PubKeyHash -> Value -> AccMap -> ScriptContext -> Bool
+                 PubKeyHash -> Value -> Label -> ScriptContext -> Bool
 checkDeposit tok Nothing _ _ _ _ = False
 checkDeposit tok (Just v) pkh val map ctx
   = geq val emptyValue &&
@@ -55,8 +57,7 @@ checkTransfer ::
               AssetClass ->
                 Maybe Value ->
                   Maybe Value ->
-                    PubKeyHash ->
-                      PubKeyHash -> Value -> AccMap -> ScriptContext -> Bool
+                    PubKeyHash -> PubKeyHash -> Value -> Label -> ScriptContext -> Bool
 checkTransfer tok Nothing _ _ _ _ _ _ = False
 checkTransfer tok (Just vF) Nothing _ _ _ _ _ = False
 checkTransfer tok (Just vF) (Just vT) from to val map ctx
@@ -66,8 +67,9 @@ checkTransfer tok (Just vF) (Just vT) from to val map ctx
           newDatum ctx ==
             (tok, insert from (vF - val) (insert to (vT + val) map))
 
-agdaValidator :: Datum -> Redeemer -> ScriptContext -> Bool
-agdaValidator (tok, map) red ctx
+agdaValidator ::
+              Params -> Datum -> Redeemer -> ScriptContext -> Bool
+agdaValidator par (tok, map) red ctx
   = checkTokenIn tok ctx &&
       case red of
           Open pkh -> checkTokenOut tok ctx &&
@@ -115,8 +117,9 @@ checkValue addr tn ctx
         minValue + assetClassValue (ownAssetClass tn ctx) 1
 
 agdaPolicy ::
-           Address -> TxOutRef -> TokenName -> () -> ScriptContext -> Bool
-agdaPolicy addr oref tn _ ctx
+           Params ->
+             Address -> TxOutRef -> TokenName -> () -> ScriptContext -> Bool
+agdaPolicy par addr oref tn _ ctx
   = if amt == 1 then
       continuingAddr addr ctx &&
         consumes oref ctx &&

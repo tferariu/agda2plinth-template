@@ -5,6 +5,12 @@ import Value (Value, assetClassValue, assetClassValueOf, geq, minValue)
 
 data Label = Label{ratio :: Rational, owner :: PubKeyHash}
 
+eqLabel :: Label -> Label -> Bool
+eqLabel b c = ratio b == ratio c && owner b == owner c
+
+instance Eq Label where
+    (==) = eqLabel
+
 type Datum = (AssetClass, Label)
 
 data Redeemer = Update Value Rational
@@ -57,8 +63,9 @@ checkValue addr tn ctx
   = checkTokenOutAddr addr (ownAssetClass tn ctx) ctx
 
 agdaPolicy ::
-           Address -> TxOutRef -> TokenName -> () -> ScriptContext -> Bool
-agdaPolicy addr oref tn _ ctx
+           Params ->
+             Address -> TxOutRef -> TokenName -> () -> ScriptContext -> Bool
+agdaPolicy par addr oref tn _ ctx
   = if amt == 1 then
       continuingAddr addr ctx &&
         consumes oref ctx &&

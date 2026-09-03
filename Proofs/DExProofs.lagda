@@ -268,7 +268,7 @@ validatorImpliesRunning par (tok , lab) Stop ctx refl p2 = ⊥-elim (&&2false (c
 mintingImpliesInitial : ∀ (par : Params) (adr : Address)
   (oref : TxOutRef) (tn : TokenName) (ctx : ScriptContext)
   -> getMintedAmount ctx ≡ 1
-  -> (pf : agdaPolicy adr oref tn tt ctx ≡ true)
+  -> (pf : agdaPolicy par adr oref tn tt ctx ≡ true)
   -> (getPar par oref tn ⊢ getMintS tn ctx
       × continuing ctx ≡ true
       × getMintedAmount ctx ≡ 1
@@ -280,7 +280,7 @@ mintingImpliesInitial record { sellCurr = sellC ; buyCurr = buyC } adr oref tn c
 bothImplyFinal : ∀ (par : Params) (d : Datum) (adr : Address)
   (oref : TxOutRef) (tn : TokenName) (i : Redeemer) (ctx : ScriptContext)
   -> getMintedAmount ctx ≡ -1
-  -> (agdaValidator par d i ctx && agdaPolicy adr oref tn tt ctx) ≡ true
+  -> (agdaValidator par d i ctx && agdaPolicy par adr oref tn tt ctx) ≡ true
   -> (getPar par oref tn ⊢ getS d ctx ~[ i ]~| getS' d ctx
       × continuing ctx ≡ false
       × getMintedAmount ctx ≡ -1
@@ -323,7 +323,7 @@ initialImpliesMinting : ∀ (par : Params) (adr : Address)
      × continuing ctx ≡ true
      × getMintedAmount ctx ≡ 1
      × checkTokenOut (ownAssetClass tn ctx) ctx ≡ true)
-  -> agdaPolicy adr oref tn top ctx ≡ true
+  -> agdaPolicy par adr oref tn top ctx ≡ true
 
 initialImpliesMinting record { sellCurr = sellC ; buyCurr = buyC } adr oref tn top ctx ((TStart refl refl p3) , refl , refl , p6 )
   rewrite t=t (ownAssetClass tn ctx) | n=n oref | p3 | p6 = refl
@@ -335,7 +335,7 @@ finalImpliesBoth : ∀ {tn i} (par : Params) (d : Datum)
      × continuing ctx ≡ false
      × getMintedAmount ctx ≡ -1
      × checkTokenIn (d .fst) ctx ≡ true)
-  -> ((agdaValidator par d i ctx && agdaPolicy adr oref tn tt ctx) ≡ true)
+  -> ((agdaValidator par d i ctx && agdaPolicy par adr oref tn tt ctx) ≡ true)
 
 finalImpliesBoth par d adr oref ctx ((TStop refl) , refl , refl , p4 ) rewrite n=n (owner (d .snd)) | p4 = refl
 
@@ -376,10 +376,10 @@ classifier _ = Final
 -- The Validator as a function returning a boolean
 totalF : Argument -> Bool
 totalF arg with classifier arg
-... | Initial  = agdaPolicy (arg .adr) (arg .oref) (arg .tn) tt (arg .ctx)
+... | Initial  = agdaPolicy (arg .par) (arg .adr) (arg .oref) (arg .tn) tt (arg .ctx)
 ... | Running  = agdaValidator (arg .par) (arg .dat) (arg .red) (arg .ctx) 
 ... | Final = agdaValidator (arg .par) (arg .dat) (arg .red) (arg .ctx) &&
-                 agdaPolicy (arg .adr) (arg .oref) (arg .tn) tt (arg .ctx)
+                 agdaPolicy (arg .par) (arg .adr) (arg .oref) (arg .tn) tt (arg .ctx)
 
 -- The State Transition System as a relation
 totalR : Argument -> Set

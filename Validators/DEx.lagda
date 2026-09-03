@@ -24,6 +24,9 @@ instance
 
 Datum = (AssetClass × Label)
 
+
+{-# COMPILE AGDA2HS eqLabel #-}
+{-# COMPILE AGDA2HS iEqLabel #-}
 {-# COMPILE AGDA2HS Label #-}
 {-# COMPILE AGDA2HS Datum #-}
 
@@ -172,8 +175,8 @@ checkValue addr tn ctx = checkTokenOutAddr addr (ownAssetClass tn ctx) ctx
 {-# COMPILE AGDA2HS checkValue #-}
 
 -- The Thread Token Minting Policy
-agdaPolicy : Address -> TxOutRef -> TokenName -> ⊤ -> ScriptContext -> Bool
-agdaPolicy addr oref tn _ ctx =
+agdaPolicy : Params -> Address -> TxOutRef -> TokenName -> ⊤ -> ScriptContext -> Bool
+agdaPolicy par addr oref tn _ ctx =
   if      amt == 1  then continuingAddr addr ctx &&
                          consumes oref ctx &&
                          checkDatum addr tn ctx &&

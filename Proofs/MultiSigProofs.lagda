@@ -668,7 +668,7 @@ getS' (tok , Holding) ctx = record
 getS' (tok , Collecting v pkh d sigs) ctx = record
              { datum = newDatum ctx
              ; value = newValue ctx
-             ; outVal = getPayment pkh ctx
+             ; outVal = getPayment pkh v ctx
              ; interval = validRange ctx
              ; tsig = sig ctx
              ; spends = iRef ctx
@@ -730,7 +730,7 @@ validatorImpliesRunning par (tok , Collecting v pkh d sigs) Pay ctx@record { inp
   = (TPay (lengthNatToLength (minSigs par) sigs (get (go (checkTokenIn tok ctx) pf))) refl refl
   (==vto≡ (outputVal + v) inputVal (get (go (checkPayment pkh v ctx)
   (go (checkTokenOut tok ctx) (go continues (go ((lengthNat sigs) >= (minSigs par)) (go (checkTokenIn tok ctx) pf)))))))
-  (==vto≡ (getPayment pkh ctx) v (get (go (checkTokenOut tok ctx) (go continues (go ((lengthNat sigs) >= (minSigs par)) (go (checkTokenIn tok ctx) pf))))))) ,
+  (==vto≡ (getPayment pkh v ctx) v (get (go (checkTokenOut tok ctx) (go continues (go ((lengthNat sigs) >= (minSigs par)) (go (checkTokenIn tok ctx) pf))))))) ,
   get (go ((lengthNat sigs) >= (minSigs par)) (go (checkTokenIn tok ctx) pf)) , get pf , get (go continues (go ((lengthNat sigs) >= (minSigs par)) (go (checkTokenIn tok ctx) pf)))
 validatorImpliesRunning par (tok , Collecting v pkh d sigs) Pay ctx@record { outputDatum = (tok' , Collecting v' pkh' d' sigs') ; continues = continues } n pf = ⊥-elim (&&3false ((lengthNat sigs) >= (par .minSigs)) continues (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))
 
@@ -812,8 +812,8 @@ runningImpliesValidator par (tok , Collecting v pkh d sigs) i ctx
   rewrite v=v (oldValue ctx) | v=v v | n=n pkh | i=i d | t=t tok
     | l=l (insert sig sigs) | n=n sig | ∈toElem p1 | p7 | p8 = p8 
 runningImpliesValidator par (tok , Collecting v pkh d sigs) i ctx
-  (TPay p1 refl refl refl refl , refl , p7 , p8)
-  rewrite v=v v | v=v ((newValue ctx) + v) | t=t tok
+  (TPay p1 refl refl refl p5 , refl , p7 , p8)
+  rewrite p5 | v=v v | v=v ((newValue ctx) + v) | t=t tok
     | lengthToLengthNat (minSigs par) sigs p1 | p7 | p8 = refl
 runningImpliesValidator par (tok , Collecting v pkh d sigs) i ctx
   (TCancel p1 refl refl refl , refl , p6 , p7)

@@ -1,4 +1,4 @@
-\begin{code}
+\begin{code}[hide]
 open import Haskell.Prelude 
 open import Lib
 open import Value
@@ -64,12 +64,12 @@ newValue ctx = ScriptContext.outputVal ctx
 continuing : ScriptContext -> Bool
 continuing ctx = ScriptContext.continues ctx
 
-getPayment' : PubKeyHash -> List (PubKeyHash × Value) -> Value
-getPayment' pkh [] = emptyValue
-getPayment' pkh ((pkh' , v) ∷ xs) = if pkh == pkh' then v else getPayment' pkh xs
+getPayment' : PubKeyHash -> Value -> List (PubKeyHash × Value) -> Value
+getPayment' pkh v [] = emptyValue
+getPayment' pkh v ((pkh' , v') ∷ xs) = if pkh == pkh' && v == v' then v else getPayment' pkh v xs
 
-getPayment : PubKeyHash -> ScriptContext -> Value
-getPayment pkh ctx = getPayment' pkh (ScriptContext.payments ctx)
+getPayment : PubKeyHash -> Value -> ScriptContext -> Value
+getPayment pkh v ctx = getPayment' pkh v (ScriptContext.payments ctx)
 
 getMintedAmount : ScriptContext -> Integer
 getMintedAmount ctx = ScriptContext.mint ctx 
@@ -109,7 +109,7 @@ checkTokenOutAddr : Address -> AssetClass -> ScriptContext -> Bool
 checkTokenOutAddr adr = checkTokenOut
 
 checkPayment : PubKeyHash -> Value -> ScriptContext -> Bool
-checkPayment pkh v ctx = getPayment pkh ctx == v
+checkPayment pkh v ctx = getPayment pkh v ctx == v
 
 
 validRange : ScriptContext -> Interval
@@ -199,11 +199,11 @@ notTooLate par d ctx =
 \newcommand\msProposeI{%
 \begin{code}
 agdaValidator : Params -> Datum -> Redeemer -> ScriptContext -> Bool
-agdaValidator param (tok , lab) red ctx = checkTokenIn tok ctx &&
+agdaValidator par (tok , lab) red ctx = checkTokenIn tok ctx &&
   (case (lab , red) of λ where
     (Holding , (Propose v pkh d)) ->
       newValue ctx == oldValue ctx && geq (oldValue ctx) (v + minValue) &&
-      geq v minValue && notTooLate param d ctx && continuing ctx &&
+      geq v minValue && notTooLate par d ctx && continuing ctx &&
       checkTokenOut tok ctx && (case (newDatum ctx) of λ where
         (tok' , Holding) -> False
         (tok' , (Collecting v' pkh' d' sigs')) ->
@@ -215,7 +215,7 @@ agdaValidator param (tok , lab) red ctx = checkTokenIn tok ctx &&
 \begin{code}
     ((Collecting v pkh d sigs) , (Add sig)) ->
       newValue ctx == oldValue ctx && checkSigned sig ctx &&
-      elem sig (authSigs param) && continuing ctx &&
+      elem sig (authSigs par) && continuing ctx &&
       checkTokenOut tok ctx && (case (newDatum ctx) of λ where
         (tok' , Holding) -> False
         (tok' , (Collecting v' pkh' d' sigs')) ->
@@ -237,7 +237,7 @@ agdaValidator param (tok , lab) red ctx = checkTokenIn tok ctx &&
 \newcommand\msPayI{%
 \begin{code}
     ((Collecting v pkh d sigs) , Pay) ->
-      (lengthNat sigs) >= (minSigs param) && continuing ctx &&
+      (lengthNat sigs) >= (minSigs par) && continuing ctx &&
       (checkTokenOut tok ctx) && (case (newDatum ctx) of λ where
         (tok' , Holding) -> checkPayment pkh v ctx &&
           ((newValue ctx) + v) == oldValue ctx && tok == tok'

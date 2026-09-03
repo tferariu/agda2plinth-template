@@ -1,4 +1,4 @@
-\begin{code}
+\begin{code}[hide]
 open import Validators.MultiSigLatex
 open import Lib
 open import Value
@@ -313,7 +313,7 @@ noDups->Unique (x ∷ y ∷ l) p = (noDupsLemma (get p)) :: noDups->Unique (y �
 validStateInitial : ∀ {s par}
   -> par ⊢ s
   -> valid s
-validStateInitial (TStart p1 p' p2 p3 p4 p5) = Hol p1
+validStateInitial (TStart p1 p2 p3 p4 p5 p6) = Hol p1
 \end{code}
 }
 
@@ -322,9 +322,9 @@ validStateInitial (TStart p1 p' p2 p3 p4 p5) = Hol p1
 validParamsInitial : ∀ {s par}
   -> par ⊢ s
   -> validP par
-validParamsInitial {par = par} (TStart p1 p' p2 p3 p4 p5)
-  = noDups->Unique (authSigs par) p3 ,
-    lengthNatToLength (minSigs par) (par .authSigs) p4 , p5
+validParamsInitial {par = par} (TStart p1 p2 p3 p4 p5 p6)
+  = noDups->Unique (authSigs par) p4 ,
+    lengthNatToLength (minSigs par) (par .authSigs) p5 , p6
 \end{code}
 }
 
@@ -335,7 +335,7 @@ validStateTransition : ∀ {s s' : State} {i par}
   -> par ⊢ s ~[ i ]~> s'
   -> valid s'
 validStateTransition iv (TPropose p1 p2 p3 p4 refl p6) = Col p4 p1 p2 root
-validStateTransition {s} (Hol refl) (TAdd p1 p2 () p4 p5)
+validStateTransition (Hol refl) (TAdd p1 p2 () p4 p5)
 validStateTransition (Col refl pf2 pf3 pf4) (TAdd p1 refl refl refl refl)
   = Col refl pf2 pf3 (insertPreservesUniqueness pf4)
 validStateTransition iv (TPay p1 p2 p3 p4 p5) = Hol p3 
@@ -433,17 +433,17 @@ prop {v} {pkh} {d} {sigs} {tok} s1 s2 par
 \newcommand\msPropOne{%
 \begin{code}
 prop1 : ∀ { v pkh d sigs tok } (s s' : State) (par : MParams)
-        -> datum s ≡ (tok , Collecting v pkh d sigs)
-        -> datum s' ≡ (tok , Collecting v pkh d (insertList (authSigs par) sigs))
-        -> outVal s ≡ outVal s'
-        -> interval s ≡ interval s'
-        -> value s ≡ value s'
-        -> spends s ≡ spends s'
-        -> threadTokCS s ≡ threadTokCS s'
-        -> tsig s' ≡ finalSig (tsig s) (authSigs par)
-        -> par ⊢ s ~[ (makeIs (authSigs par)) ]~* s'
-prop1 s s' par p1 p2 p3 p4 p5 p6 p7 p8
-  = prop s s' par (authSigs par) [] (authSigs par) refl refl p1 p2 p3 p4 p5 p6 p7 p8
+  -> datum s ≡ (tok , Collecting v pkh d sigs)
+  -> datum s' ≡ (tok , Collecting v pkh d (insertList (authSigs par) sigs))
+  -> outVal s ≡ outVal s'
+  -> interval s ≡ interval s'
+  -> value s ≡ value s'
+  -> spends s ≡ spends s'
+  -> threadTokCS s ≡ threadTokCS s'
+  -> tsig s' ≡ finalSig (tsig s) (authSigs par)
+  -> par ⊢ s ~[ (makeIs (authSigs par)) ]~* s'
+prop1 s s' par p1 p2 p3 p4 p5 p6 p7 p8  = prop s s' par
+  (authSigs par) [] (authSigs par) refl refl p1 p2 p3 p4 p5 p6 p7 p8
 \end{code}
 }
 
@@ -605,17 +605,13 @@ liqLemma {v} {pkh} {d} {sigs} {tok}
 \end{code}
 }
 
-\begin{code}[hide]
 
-
-
-                                                                             
-
-
+\newcommand\msRewrites{%
+\begin{code}
 rewriteValue : ∀ (a b : Value)
   -> (a + (negValue b)) + b ≡ a
-rewriteValue a b rewrite assocVal a (negValue b) b | commVal (negValue b) b
-  | v-v b | addValIdR a = refl
+rewriteValue a b rewrite assocVal a (negValue b) b
+  | commVal (negValue b) b | v-v b | addValIdR a = refl
   
 rewriteGeq : ∀ (a b : Value)
   -> geq a ((a + (negValue b)) + b) ≡ true
@@ -623,8 +619,17 @@ rewriteGeq a b rewrite rewriteValue a b = geq-refl a
 
 rewriteValue' : ∀ (a b : Value)
   -> b + (a + (negValue b)) ≡ a
-rewriteValue' a b rewrite commVal b (a + (negValue b)) | rewriteValue a b  = refl
+rewriteValue' a b rewrite commVal b (a + (negValue b))
+  | rewriteValue a b  = refl
+\end{code}
+}
 
+
+\begin{code}[hide]
+
+
+
+                                                                             
 
 --Liquidity (For any state that is valid and has valid parameters,
 --there exists another state and some inputs such that we can transition
@@ -647,12 +652,17 @@ sfin = record
 }
 
 
-\newcommand\msLiquidityOne{%
+\newcommand\msLiquidityStatement{%
 \begin{code}
 liquidity : ∀ (par : MParams) (s : State)
           -> invariant s -> validP par
           -> ∃[ s' ] ∃[ is ] (par ⊢ s ~[ is ]~|* s')
-          
+\end{code}
+}
+
+
+\newcommand\msLiquidityProof{%
+\begin{code}         
 liquidity par s@record { datum = (tok , Holding) ; value = value }
   (Hol refl) p@(p2 , p3 , p4)
   with (lovelaces x2MinValue > lovelaces value) in eq
@@ -693,12 +703,18 @@ liquidity par s@record { datum = (tok , Holding) ; value = value }
              ; tsig = s .tsig
              ; spends = s .spends
              ; threadTokCS = s .threadTokCS }
-             
+
+\end{code}
+\newcommand\msLiquidityProofTwo{%
+\begin{code}         
 liquidity par record { datum = (tok , Collecting v' pkh' d' sigs') ;
-  value = value ; outVal = outVal ; interval = interval ; tsig = tsig ;
-  spends = spends ; threadTokCS = threadTokCS }
-  (Col refl p2 p3 p4) p@(p7 , p8 , p9)
-  = ⟨ sfin , ⟨ ((Cancel ∷ (Propose (value - minValue) 0 0) ∷
+  value = value } (Col refl p2 p3 p4) p@(p7 , p8 , p9) =
+\end{code}
+}
+
+\begin{code}[hide]
+
+    ⟨ sfin , ⟨ ((Cancel ∷ (Propose (value - minValue) 0 0) ∷
     ((makeIs (authSigs par)) ++ [ Pay ])) ++ [ Stop ]) ,
     fin {s' = s'''} (cons {s' = s'} (TCancel (ltIntegerLemma d')
     refl refl refl) (cons (TPropose (rewriteGeq value minValue)
@@ -861,7 +877,7 @@ getS' (tok , Holding) ctx = record
 getS' (tok , Collecting v pkh d sigs) ctx = record
              { datum = newDatum ctx
              ; value = newValue ctx
-             ; outVal = getPayment pkh ctx
+             ; outVal = getPayment pkh v ctx
              ; interval = validRange ctx
              ; tsig = sig ctx
              ; spends = iRef ctx
@@ -938,7 +954,7 @@ validatorImpliesRunning par (tok , Collecting v pkh d sigs) Pay ctx@record { inp
   = (TPay (lengthNatToLength (minSigs par) sigs (get (go (checkTokenIn tok ctx) pf))) refl refl
   (==vto≡ (outputVal + v) inputVal (get (go (checkPayment pkh v ctx)
   (go (checkTokenOut tok ctx) (go continues (go ((lengthNat sigs) >= (minSigs par)) (go (checkTokenIn tok ctx) pf)))))))
-  (==vto≡ (getPayment pkh ctx) v (get (go (checkTokenOut tok ctx) (go continues (go ((lengthNat sigs) >= (minSigs par)) (go (checkTokenIn tok ctx) pf))))))) ,
+  (==vto≡ (getPayment pkh v ctx) v (get (go (checkTokenOut tok ctx) (go continues (go ((lengthNat sigs) >= (minSigs par)) (go (checkTokenIn tok ctx) pf))))))) ,
   get (go ((lengthNat sigs) >= (minSigs par)) (go (checkTokenIn tok ctx) pf)) , get pf , get (go continues (go ((lengthNat sigs) >= (minSigs par)) (go (checkTokenIn tok ctx) pf)))
 validatorImpliesRunning par (tok , Collecting v pkh d sigs) Pay ctx@record { outputDatum = (tok' , Collecting v' pkh' d' sigs') ; continues = continues } n pf = ⊥-elim (&&3false ((lengthNat sigs) >= (par .minSigs)) continues (checkTokenOut tok ctx) (go (checkTokenIn tok ctx) pf))
 
@@ -1020,8 +1036,8 @@ runningImpliesValidator par (tok , Collecting v pkh d sigs) i ctx
   rewrite v=v (oldValue ctx) | v=v v | n=n pkh | i=i d | t=t tok
     | l=l (insert sig sigs) | n=n sig | ∈toElem p1 | p7 | p8 = p8 
 runningImpliesValidator par (tok , Collecting v pkh d sigs) i ctx
-  (TPay p1 refl refl refl refl , refl , p7 , p8)
-  rewrite v=v v | v=v ((newValue ctx) + v) | t=t tok
+  (TPay p1 refl refl refl p5 , refl , p7 , p8)
+  rewrite p5 | v=v v | v=v ((newValue ctx) + v) | t=t tok
     | lengthToLengthNat (minSigs par) sigs p1 | p7 | p8 = refl
 runningImpliesValidator par (tok , Collecting v pkh d sigs) i ctx
   (TCancel p1 refl refl refl , refl , p6 , p7)

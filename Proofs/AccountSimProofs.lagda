@@ -243,7 +243,7 @@ data _⊢_~[_]~|*_ : MParams -> State -> List Redeemer -> State -> Set
 threadToken : State -> AssetClass
 threadToken s = s .datum .fst
 
-accMap : State -> AccMap
+accMap : State -> Label
 accMap s = s .datum .snd
 \end{code}
 }
@@ -276,7 +276,7 @@ validP par = true ≡ true
 
 \newcommand\mLem{%
 \begin{code}
-lem : ∀ {pkh} (map : AccMap) (v : Value)
+lem : ∀ {pkh} (map : Label) (v : Value)
       -> geq v emptyValue ≡ true 
       -> All (λ y → geq (snd y) emptyValue ≡ true) map
       -> All (λ y → geq (snd y) emptyValue ≡ true) (insert pkh v map)
@@ -294,7 +294,7 @@ lem {pkh} ((pkh' , v) ∷ map) v' p1 (allCons {{i}} {{is}}) with pkh == pkh'
 
 \newcommand\mDelem{%
 \begin{code}
-delem : ∀ {pkh} (map : AccMap)
+delem : ∀ {pkh} (map : Label)
       -> All (λ y → geq (snd y) emptyValue ≡ true) map
       -> All (λ y → geq (snd y) emptyValue ≡ true) (delete pkh map)
 \end{code}
@@ -312,7 +312,7 @@ delem {pkh} ((pkh' , v') ∷ map) (allCons {{i}} {{is}}) with pkh == pkh'
 
 \newcommand\mGeqlem{%
 \begin{code}
-geqLem : ∀ {pkh} (map : AccMap) (v : Value)
+geqLem : ∀ {pkh} (map : Label) (v : Value)
       -> All (λ y → geq (snd y) emptyValue ≡ true) map
       -> lookup pkh map ≡ Just v
       -> geq v emptyValue ≡ true
@@ -418,7 +418,7 @@ validity {record { datum = tok , map }}
 
 \newcommand\mSumVal{%
 \begin{code}
-sumVal : AccMap -> Value
+sumVal : Label -> Value
 sumVal [] = emptyValue
 sumVal ((k , v) ∷ xs) = v + sumVal xs
 \end{code}
@@ -438,7 +438,7 @@ internalVal s = sumVal (accMap s) + minValue + assetClassValue (threadToken s) 1
 
 \newcommand\mIValue{%
 \begin{code}
-iVal : AccMap -> AssetClass -> Value
+iVal : Label -> AssetClass -> Value
 iVal [] ac = minValue + assetClassValue ac 1
 iVal ((k , v) ∷ xs) ac = v + (iVal xs) ac
 \end{code}
@@ -453,7 +453,7 @@ internalVal' s = iVal (accMap s) (threadToken s)
 
 \newcommand\mIValEq{%
 \begin{code}
-iVal≡' : ∀ (map : AccMap) (ac : AssetClass)
+iVal≡' : ∀ (map : Label) (ac : AssetClass)
   -> sumVal map + minValue + assetClassValue ac 1 ≡ iVal map ac
 iVal≡' [] ac = refl
 iVal≡' ((pkh , v) ∷ map) ac rewrite assocVal v (sumVal map) minValue
@@ -495,7 +495,7 @@ maybe≡ refl = refl
 
 \newcommand\mIValOne{%
 \begin{code}
-iValLemma1 : ∀ {pkh} (map : AccMap) (ac : AssetClass)
+iValLemma1 : ∀ {pkh} (map : Label) (ac : AssetClass)
            -> lookup pkh map ≡ Nothing
            -> iVal map ac ≡ iVal (insert pkh emptyValue map) ac
 \end{code}
@@ -512,7 +512,7 @@ iValLemma1 {pkh} ((pkh' , v') ∷ map) ac p with pkh == pkh'
 
 \newcommand\mIValTwo{%
 \begin{code}
-iValLemma2 : ∀ {pkh} (map : AccMap) (ac : AssetClass)
+iValLemma2 : ∀ {pkh} (map : Label) (ac : AssetClass)
            -> lookup pkh map ≡ Just emptyValue
            -> iVal map ac ≡ iVal (delete pkh map) ac
 \end{code}
@@ -529,7 +529,7 @@ iValLemma2 {pkh} ((pkh' , v') ∷ map) ac p with pkh == pkh'
 
 \newcommand\mIValThree{%
 \begin{code}
-iValLemma3 : ∀ {pkh v val} (map : AccMap) (ac : AssetClass)
+iValLemma3 : ∀ {pkh v val} (map : Label) (ac : AssetClass)
            -> lookup pkh map ≡ Just v
            -> (iVal map ac) + val ≡
               iVal (insert pkh (v + val) map) ac
@@ -550,7 +550,7 @@ iValLemma3 {pkh} {v} {val} ((pkh' , v') ∷ map) ac p with pkh == pkh'
 
 \newcommand\mIValFour{%
 \begin{code}
-iValLemma4 : ∀ {from to vF vT val} (map : AccMap) (ac : AssetClass)
+iValLemma4 : ∀ {from to vF vT val} (map : Label) (ac : AssetClass)
            -> lookup from map ≡ Just vF
            -> lookup to map ≡ Just vT
            -> from ≢ to
@@ -704,7 +704,7 @@ multiStepInvariant p (cons t ts) = multiStepInvariant (stateInvariant p t) ts
 
 \newcommand\mMakeIs{%
 \begin{code}
-makeIs : AccMap -> List Redeemer
+makeIs : Label -> List Redeemer
 makeIs [] = []
 makeIs ((pkh , v) ∷ map) = (Withdraw pkh v) ∷ (Close pkh) ∷ (makeIs map)
 \end{code}
@@ -712,7 +712,7 @@ makeIs ((pkh , v) ∷ map) = (Withdraw pkh v) ∷ (Close pkh) ∷ (makeIs map)
 
 \newcommand\mLastSig{%
 \begin{code}
-lastSig : AccMap -> PubKeyHash -> PubKeyHash
+lastSig : Label -> PubKeyHash -> PubKeyHash
 lastSig [] pkh = pkh
 lastSig ((pkh' , v') ∷ []) pkh = pkh'
 lastSig (x ∷ y ∷ map) pkh = lastSig (y ∷ map) pkh
@@ -721,7 +721,7 @@ lastSig (x ∷ y ∷ map) pkh = lastSig (y ∷ map) pkh
 
 \newcommand\mSameLS{%
 \begin{code}
-sameLastSig : ∀ {x sig sig'} (map : AccMap)
+sameLastSig : ∀ {x sig sig'} (map : Label)
              -> lastSig (x ∷ map) sig ≡ lastSig (x ∷ map) sig'
 sameLastSig [] = refl
 sameLastSig (y ∷ map) = sameLastSig map
@@ -731,7 +731,7 @@ sameLastSig (y ∷ map) = sameLastSig map
 
 \newcommand\mLSLemma{%
 \begin{code}
-lastSigLemma : ∀ {pkh v sig} (map : AccMap)
+lastSigLemma : ∀ {pkh v sig} (map : Label)
               -> lastSig ((pkh , v) ∷ map) sig ≡ lastSig map pkh
 lastSigLemma [] = refl
 lastSigLemma (x ∷ []) = refl
@@ -753,7 +753,7 @@ rwLookup refl = refl
 
 \newcommand\mRWID{%
 \begin{code}
-rwInsertDelete : ∀ {a : AssetClass} {b : Bool} { x y z : AccMap }
+rwInsertDelete : ∀ {a : AssetClass} {b : Bool} { x y z : Label }
             -> b ≡ true
             -> x ≡ z
             -> (a , z) ≡ (a , (if b then x else y))
@@ -764,9 +764,9 @@ rwInsertDelete refl refl = refl
 
 \newcommand\mRWAM{%
 \begin{code}
-rwAccMap : ∀ (pkh : PubKeyHash) (val : Value) (map : AccMap)
+rwLabel : ∀ (pkh : PubKeyHash) (val : Value) (map : Label)
            -> (pkh , val - val) ∷ map ≡ (pkh , emptyValue) ∷ map
-rwAccMap pkh val map rewrite (v-v val) = refl
+rwLabel pkh val map rewrite (v-v val) = refl
 \end{code}
 }
 
@@ -783,7 +783,7 @@ rwVal v1 v2 rewrite commVal v2 v1
 
 \newcommand\mGetG{%
 \begin{code}
-getGeq : ∀ {x} (map : AccMap)
+getGeq : ∀ {x} (map : Label)
   -> All (\y -> geq (snd y) emptyValue ≡ true) (x ∷ map)
   -> geq (snd x) emptyValue ≡ true
 getGeq map (allCons {{i}} {{is}}) = i
@@ -794,7 +794,7 @@ getGeq map (allCons {{i}} {{is}}) = i
 
 \newcommand\mGetV{%
 \begin{code}
-getValid : ∀ {x} (map : AccMap)
+getValid : ∀ {x} (map : Label)
   -> All (\y -> geq (snd y) emptyValue ≡ true) (x ∷ map)
   -> All (\y -> geq (snd y) emptyValue ≡ true) map
 getValid map (allCons {{i}} {{is}}) = is
@@ -804,7 +804,7 @@ getValid map (allCons {{i}} {{is}}) = is
 
 \newcommand\mLiqLemma{%
 \begin{code}
-liqLemma : ∀ {tok} {map : AccMap} (s s' : State) {par}
+liqLemma : ∀ {tok} {map : Label} (s s' : State) {par}
         -> datum s ≡ (tok , map)
         -> datum s' ≡ (tok , [])
         -> value s' ≡ minValue + assetClassValue tok 1
@@ -825,7 +825,7 @@ liqLemma s@record { datum = (tok , (pkh , v) ∷ map') }
       s' refl refl refl refl refl refl refl p
       = cons {s' = st} (TWithdraw refl refl (rwLookup (n=n pkh))
         (getGeq map' p) (geq-refl v) (rwInsertDelete (n=n pkh)
-        (rwAccMap pkh v map')) (rwVal (value st) v)) 
+        (rwLabel pkh v map')) (rwVal (value st) v)) 
         (cons {s' = st'} (TClose refl refl (rwLookup (n=n pkh))
         (rwInsertDelete (n=n pkh) refl) refl )
         (liqLemma st' s' refl refl refl (lastSigLemma map')
@@ -961,7 +961,7 @@ originStateRewrite par s s' i (TTransfer x x₁ x₂ x₃ x₄ x₅ x₆ x₇ x�
 
 \newcommand\mSkipInsert{%
 \begin{code}                           
-skipInsert : ∀ {val} (pkh1 pkh2 : PubKeyHash) (map : AccMap)
+skipInsert : ∀ {val} (pkh1 pkh2 : PubKeyHash) (map : Label)
              -> pkh1 ≢ pkh2
              -> lookup pkh2 map ≡ lookup pkh2 (insert pkh1 val map)        
 \end{code}
@@ -1013,7 +1013,7 @@ otherAccountsUnaffectedW record {datum = (tok , map)} s' par pkh1 pkh2
 
 \newcommand\mRWD{%
 \begin{code}                           
-rwDatum : ∀ {tok : AssetClass} (pkh : PubKeyHash) (v : Value) (map : AccMap)
+rwDatum : ∀ {tok : AssetClass} (pkh : PubKeyHash) (v : Value) (map : Label)
   -> (tok , insert pkh emptyValue map) ≡
      (tok , insert pkh (v - v) map)
 rwDatum pkh v map rewrite v-v v = refl
@@ -1023,7 +1023,7 @@ rwDatum pkh v map rewrite v-v v = refl
 
 \newcommand\mLIL{%
 \begin{code}                           
-lookupInsertLemma : ∀ (pkh : PubKeyHash) (v : Value) (map : AccMap)
+lookupInsertLemma : ∀ (pkh : PubKeyHash) (v : Value) (map : Label)
   -> lookup pkh (insert pkh v map) ≡ Just v
 lookupInsertLemma pkh v [] rewrite n=n pkh = refl
 lookupInsertLemma pkh v (x ∷ map') with pkh == x .fst in eq
@@ -1072,7 +1072,7 @@ userCanRecoverFunds {val} s@record { datum = (tok , map) ; value = v}
 
 
 
-\newcommand\mDF{%
+\newcommand\mDeadlock{%
 \begin{code}
 deadlockFreedom : ∀ (s : State) (par : MParams)
           -> invariant s
@@ -1080,7 +1080,7 @@ deadlockFreedom : ∀ (s : State) (par : MParams)
 \end{code}
 }
 
-\newcommand\mDFp{%
+\newcommand\mDeadlockp{%
 \begin{code}
 deadlockFreedom record { datum = (tok , []) } par (p1 , p2)
   = ⟨ s1 , ⟨ Stop , (inj₂ (TStop refl)) ⟩ ⟩
@@ -1149,20 +1149,20 @@ targetStateRewrite par s s' i (TTransfer x x₁ x₂ x₃ x₄ x₅ x₆ x₇ x�
 
 --(TWithdraw refl refl (rwLookup (n=n pkh))
  --       (getGeq map' p) (geq-refl v) (rwInsertDelete (n=n pkh)
-   --     (rwAccMap pkh v map')) (rwVal (value st) v)) 
+   --     (rwLabel pkh v map')) (rwVal (value st) v)) 
 
 
 
 
-checkWithdraw' : AssetClass -> Maybe Value -> PubKeyHash -> Value -> AccMap -> Datum -> Bool
+checkWithdraw' : AssetClass -> Maybe Value -> PubKeyHash -> Value -> Label -> Datum -> Bool
 checkWithdraw' tok Nothing _ _ _ _ = false
 checkWithdraw' tok (Just v) pkh val map (tok' , map') = geq val emptyValue && geq v val && ((tok' , map') == (tok , insert pkh (v - val) map))
 
-checkDeposit' : AssetClass -> Maybe Value -> PubKeyHash -> Value -> AccMap -> Datum -> Bool
+checkDeposit' : AssetClass -> Maybe Value -> PubKeyHash -> Value -> Label -> Datum -> Bool
 checkDeposit' tok Nothing _ _ _ _ = false
 checkDeposit' tok (Just v) pkh val map (tok' , map') = geq val emptyValue && ((tok' , map') == (tok , insert pkh (v + val) map))
 
-checkTransfer' : AssetClass -> Maybe Value -> Maybe Value -> PubKeyHash -> PubKeyHash -> Value -> AccMap -> Datum -> Bool
+checkTransfer' : AssetClass -> Maybe Value -> Maybe Value -> PubKeyHash -> PubKeyHash -> Value -> Label -> Datum -> Bool
 checkTransfer' tok Nothing _ _ _ _ _ _ = false
 checkTransfer' tok (Just vF) Nothing _ _ _ _ _ = false
 checkTransfer' tok (Just vF) (Just vT) from to val map (tok' , map') = geq val emptyValue && geq vF val && from /= to &&
@@ -1277,10 +1277,10 @@ classifier _ = Final
 \begin{code}
 totalF : Argument -> Bool
 totalF arg with classifier arg
-... | Initial = agdaPolicy (arg .adr) (arg .oref) (arg .tn) tt (arg .ctx)
-... | Running = agdaValidator (arg .dat) (arg .red) (arg .ctx) 
-... | Final   = agdaValidator (arg .dat) (arg .red) (arg .ctx) &&
-                agdaPolicy (arg .adr) (arg .oref) (arg .tn) tt (arg .ctx)
+... | Initial = agdaPolicy tt (arg .adr) (arg .oref) (arg .tn) tt (arg .ctx)
+... | Running = agdaValidator tt (arg .dat) (arg .red) (arg .ctx) 
+... | Final   = agdaValidator tt (arg .dat) (arg .red) (arg .ctx) &&
+                agdaPolicy tt (arg .adr) (arg .oref) (arg .tn) tt (arg .ctx)
 \end{code}
 }
 
@@ -1326,7 +1326,7 @@ totalR arg with classifier arg
   rewrite (==to≡ fst1 fst2 (get pf))
         | (==vto≡ snd1 snd2 (go (fst1 == fst2) pf)) = refl
         
-==mto≡ : ∀ (a b : AccMap) -> (a == b) ≡ true -> a ≡ b
+==mto≡ : ∀ (a b : Label) -> (a == b) ≡ true -> a ≡ b
 ==mto≡ [] [] pf = refl
 ==mto≡ (x ∷ a) (y ∷ b) pf rewrite (==pto≡ x y (get pf))
   = cong (λ x → y ∷ x) (==mto≡ a b (go (x == y) pf))
@@ -1340,7 +1340,7 @@ totalR arg with classifier arg
 mintingImpliesInitial : ∀ (adr : Address) (oref : TxOutRef) (tn : TokenName)
   (top : ⊤) (ctx : ScriptContext)
   -> getMintedAmount ctx ≡ 1
-  -> agdaPolicy adr oref tn top ctx ≡ true
+  -> agdaPolicy tt adr oref tn top ctx ≡ true
   -> (getPar oref tn ⊢ getMintS tn ctx
      × continuing ctx ≡ true
      × getMintedAmount ctx ≡ 1
@@ -1372,7 +1372,7 @@ mintingImpliesInitial adr oref tn top ctx@record { outputVal = outputVal ;
 validatorImpliesRunning :
   ∀ {par} (d : Datum) (i : Redeemer) (ctx : ScriptContext) 
   -> getMintedAmount ctx ≡ 0
-  -> agdaValidator d i ctx ≡ true
+  -> agdaValidator tt d i ctx ≡ true
   -> (par ⊢ getS d ctx ~[ i ]~> getS' ctx
      × continuing ctx ≡ true
      × checkTokenIn (d .fst) ctx ≡ true
@@ -1387,7 +1387,7 @@ validatorImpliesRunning :
 bothImplyFinal : ∀ {par} (d : Datum) (adr : Address) (oref : TxOutRef)
   (tn : TokenName) (i : Redeemer) (ctx : ScriptContext) 
   -> getMintedAmount ctx ≡ -1
-  -> (agdaValidator d i ctx && agdaPolicy adr oref tn tt ctx) ≡ true
+  -> (agdaValidator tt d i ctx && agdaPolicy tt adr oref tn tt ctx) ≡ true
   -> (par ⊢ getS d ctx ~[ i ]~| getS' ctx
      × continuing ctx ≡ false
      × getMintedAmount ctx ≡ -1
@@ -1403,7 +1403,7 @@ bothImplyFinal d adr oref tn (Open pkh)
     (go (checkTokenIn (d .fst) ctx) (get p2)))))
 bothImplyFinal d adr oref tn i@(Open pkh)
   ctx@record { continues = true } refl p2
-  = ⊥-elim (get⊥ (sym (go (agdaValidator d i ctx) p2) ))
+  = ⊥-elim (get⊥ (sym (go (agdaValidator tt d i ctx) p2) ))
 \end{code}
 }
 
@@ -1422,13 +1422,13 @@ bothImplyFinal d adr oref tn Stop ctx refl p2
 \newcommand\pBIFrest{%
 \begin{code}
 bothImplyFinal d adr oref tn (Close pkh) ctx@record { continues = false } refl p2 = ⊥-elim (get⊥ (sym (go (checkTokenOut (d .fst) ctx) (go (checkTokenIn (d .fst) ctx) (get p2)))))
-bothImplyFinal d adr oref tn i@(Close pkh) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator d i ctx) p2) ))
+bothImplyFinal d adr oref tn i@(Close pkh) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator tt d i ctx) p2) ))
 bothImplyFinal d adr oref tn (Withdraw pkh v) ctx@record { continues = false } refl p2 = ⊥-elim (get⊥ (sym (go (checkTokenOut (d .fst) ctx) (go (checkTokenIn (d .fst) ctx) (get p2)))))
-bothImplyFinal d adr oref tn i@(Withdraw pkh v) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator d i ctx) p2) ))
+bothImplyFinal d adr oref tn i@(Withdraw pkh v) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator tt d i ctx) p2) ))
 bothImplyFinal d adr oref tn (Deposit pkh v) ctx@record { continues = false } refl p2 = ⊥-elim (get⊥ (sym (go (checkTokenOut (d .fst) ctx) (go (checkTokenIn (d .fst) ctx) (get p2)))))
-bothImplyFinal d adr oref tn i@(Deposit pkh v) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator d i ctx) p2) ))
+bothImplyFinal d adr oref tn i@(Deposit pkh v) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator tt d i ctx) p2) ))
 bothImplyFinal d adr oref tn (Transfer from to v) ctx@record { continues = false } refl p2 = ⊥-elim (get⊥ (sym (go (checkTokenOut (d .fst) ctx) (go (checkTokenIn (d .fst) ctx) (get p2)))))
-bothImplyFinal d adr oref tn i@(Transfer from to v) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator d i ctx) p2) ))
+bothImplyFinal d adr oref tn i@(Transfer from to v) ctx@record { continues = true } refl p2 = ⊥-elim (get⊥ (sym (go (agdaValidator tt d i ctx) p2) ))
 \end{code}
 }
 
@@ -1442,9 +1442,9 @@ totalEquiv : totalF ≈ totalR
 
 \newcommand\pMapMap{%
 \begin{code}
-map=map : ∀ (map : AccMap) -> (map == map) ≡ true
-map=map [] = refl
-map=map ((tok , val) ∷ map) rewrite n=n tok | v=v val = map=map map
+m=m : ∀ (map : Label) -> (map == map) ≡ true
+m=m [] = refl
+m=m ((tok , val) ∷ map) rewrite n=n tok | v=v val = m=m map
 \end{code}
 }
 
@@ -1458,7 +1458,7 @@ initialImpliesMinting : ∀ (adr : Address) (oref : TxOutRef) (tn : TokenName)
      × continuing ctx ≡ true
      × getMintedAmount ctx ≡ 1
      × checkTokenOut (ownAssetClass tn ctx) ctx ≡ true)
-  -> agdaPolicy adr oref tn top ctx ≡ true
+  -> agdaPolicy tt adr oref tn top ctx ≡ true
 \end{code}
 }
 
@@ -1470,7 +1470,7 @@ runningImpliesValidator :
      × continuing ctx ≡ true
      × checkTokenIn (d .fst) ctx ≡ true
      × checkTokenOut (d .fst) ctx ≡ true)
-  -> agdaValidator d i ctx ≡ true
+  -> agdaValidator tt d i ctx ≡ true
 \end{code}
 }
 
@@ -1480,31 +1480,31 @@ runningImpliesValidator :
 runningImpliesValidator (tok , map) (Open pkh)
   record { inputVal = inputVal }
   ((TOpen refl refl p3 refl refl) , refl , p7 , p8)
-  rewrite p3 | n=n pkh | map=map (insert pkh emptyValue map)
+  rewrite p3 | n=n pkh | m=m (insert pkh emptyValue map)
           | v=v inputVal | t=t tok | p7 | p8 = refl
 runningImpliesValidator (tok , map) (Close pkh)
   record { inputVal = inputVal }
   ((TClose refl refl p3 refl refl) , refl , p7 , p8)
-  rewrite p3 | n=n pkh | map=map (delete pkh map)
+  rewrite p3 | n=n pkh | m=m (delete pkh map)
           | v=v inputVal | t=t tok | p7 | p8 = refl
 runningImpliesValidator (tok , map) (Deposit pkh val)
   record { inputVal = inputVal }
   ((TDeposit {v = v} refl refl p3 p4 refl refl) , refl , p8 , p9)
   rewrite p3 | n=n pkh | v=v (inputVal + val)
-          | map=map (insert pkh (v + val) map)
+          | m=m (insert pkh (v + val) map)
           | p4 | t=t tok | p8 | p9 = refl
 runningImpliesValidator (tok , map) (Withdraw pkh val)
   record { inputVal = inputVal }
   ((TWithdraw {v = v} refl refl p3 p4 p5 refl refl) , refl , p9 , p10)
   rewrite p3 | n=n pkh | v=v (inputVal - val)
-          | map=map (insert pkh (v - val) map)
+          | m=m (insert pkh (v - val) map)
           | p4 | p5 | t=t tok | p9 | p10 = refl
 runningImpliesValidator (tok , map) (Transfer from to val)
   record { inputVal = inputVal }
   ((TTransfer {vF = vF} {vT = vT} refl refl p3 p4 p5 p6 p7 refl refl) ,
   refl , p11 , p12)
   rewrite p3 | p4 | ≢to/= from to p7 | n=n from | v=v inputVal
-          | map=map (insert from (vF - val) (insert to (vT + val) map))
+          | m=m (insert from (vF - val) (insert to (vT + val) map))
           | p5 | p6 | t=t tok | p11 | p12 = refl
 \end{code}
 }
@@ -1517,7 +1517,9 @@ finalImpliesBoth : ∀ {tn par i} (d : Datum) (adr : Address)
       × continuing ctx ≡ false
       × getMintedAmount ctx ≡ -1
       × checkTokenIn (d .fst) ctx ≡ true)
-  -> (agdaValidator d i ctx && agdaPolicy adr oref tn tt ctx) ≡ true
+  -> (agdaValidator tt d i ctx && agdaPolicy tt adr oref tn tt ctx) ≡ true
+finalImpliesBoth d adr oref ctx ((TStop refl) , refl , refl , p4)
+  rewrite p4 = refl
 \end{code}
 }
 
@@ -1552,7 +1554,7 @@ initialImpliesMinting adr oref tn top record { inputVal = inputVal ; outputVal =
   rewrite sym p4 | v=v outputVal | n=n oref | t=t tok | p7  = refl 
 
 -- Getting to the terminal state implies that the validator returns true and a token can be burned
-finalImpliesBoth d adr oref ctx ((TStop refl) , refl , refl , p4) rewrite p4 = refl
+
 
 
 
@@ -1657,13 +1659,13 @@ totalEquiv = record
                → mintingImpliesInitial adr oref tn tt ctx refl pf ;
              { arg@record { dat = dat ; red = red ; ctx =
                ctx@record { mint = +[1+ N.suc n ] } } } pf
-               → ⊥-elim (&&false (agdaValidator dat red ctx) pf) ;
+               → ⊥-elim (&&false (agdaValidator tt dat red ctx) pf) ;
              { arg@record { dat = dat ; adr = adr; oref = oref; red = red ;
                tn = tn ; ctx = ctx@record { mint = (negsuc zero) } } } pf
                → bothImplyFinal dat adr oref tn red ctx refl pf ;
              { arg@record { dat = dat ; red = red ; ctx =
                ctx@record { mint = (negsuc (N.suc n)) } } } pf
-               → ⊥-elim (&&false (agdaValidator dat red ctx) pf) }
+               → ⊥-elim (&&false (agdaValidator tt dat red ctx) pf) }
 \end{code}
 }
 

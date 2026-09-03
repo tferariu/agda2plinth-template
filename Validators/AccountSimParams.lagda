@@ -11,8 +11,8 @@ module Validators.AccountSim where
 
 \newcommand\accDat{%
 \begin{code}
-Label = List (PubKeyHash × Value)
-Datum = (AssetClass × Label)
+AccMap = List (PubKeyHash × Value)
+Datum = (AssetClass × AccMap)
 \end{code}
 }
 
@@ -156,7 +156,7 @@ data Redeemer : Set where
 
 \newcommand\accInsert{%
 \begin{code}
-insert : PubKeyHash -> Value -> Label -> Label
+insert : PubKeyHash -> Value -> AccMap -> AccMap
 insert pkh val [] = ((pkh , val) ∷ [])
 insert pkh val ((x , y) ∷ xs) = if (pkh == x)
   then ((pkh , val) ∷ xs)
@@ -166,7 +166,7 @@ insert pkh val ((x , y) ∷ xs) = if (pkh == x)
 
 \newcommand\accDelete{%
 \begin{code}
-delete : PubKeyHash -> Label -> Label
+delete : PubKeyHash -> AccMap -> AccMap
 delete pkh [] = []
 delete pkh ((x , y) ∷ xs) = if (pkh == x)
   then xs
@@ -177,18 +177,11 @@ delete pkh ((x , y) ∷ xs) = if (pkh == x)
 
 \newcommand\accLookup{%
 \begin{code}
-lookup : PubKeyHash -> Label -> Maybe Value
+lookup : PubKeyHash -> AccMap -> Maybe Value
 lookup pkh [] = Nothing
 lookup pkh ((x , y) ∷ xs) = if (pkh == x)
   then Just y
   else lookup pkh xs
-\end{code}
-}
-
-
-\newcommand\accParams{%
-\begin{code}
-Params = ⊤
 \end{code}
 }
 
@@ -198,7 +191,6 @@ Params = ⊤
 {-# COMPILE AGDA2HS delete #-}
 {-# COMPILE AGDA2HS lookup #-}
 {-# COMPILE AGDA2HS Redeemer #-}
-{-# COMPILE AGDA2HS Params #-}
 \end{code}
 }
 
@@ -231,7 +223,7 @@ checkEmpty (Just v) = v == emptyValue
 \newcommand\accCheckWithdraw{%
 \begin{code}
 checkWithdraw : AssetClass -> Maybe Value -> PubKeyHash -> Value
-                -> Label -> ScriptContext -> Bool
+                -> AccMap -> ScriptContext -> Bool
 checkWithdraw tok Nothing _ _ _ _ = False
 checkWithdraw tok (Just v) pkh val map ctx =
   geq val emptyValue && geq v val &&
@@ -243,7 +235,7 @@ checkWithdraw tok (Just v) pkh val map ctx =
 \newcommand\accCheckDeposit{%
 \begin{code}
 checkDeposit : AssetClass -> Maybe Value -> PubKeyHash -> Value
-               -> Label -> ScriptContext -> Bool
+               -> AccMap -> ScriptContext -> Bool
 checkDeposit tok Nothing _ _ _ _ = False
 checkDeposit tok (Just v) pkh val map ctx =
   geq val emptyValue &&
@@ -254,7 +246,7 @@ checkDeposit tok (Just v) pkh val map ctx =
 \newcommand\accCheckTransfer{%
 \begin{code}
 checkTransfer : AssetClass -> Maybe Value -> Maybe Value -> PubKeyHash
-              -> PubKeyHash -> Value -> Label -> ScriptContext -> Bool
+              -> PubKeyHash -> Value -> AccMap -> ScriptContext -> Bool
 checkTransfer tok Nothing _ _ _ _ _ _ = False
 checkTransfer tok (Just vF) Nothing _ _ _ _ _ = False
 checkTransfer tok (Just vF) (Just vT) from to val map ctx =
@@ -262,6 +254,7 @@ checkTransfer tok (Just vF) (Just vT) from to val map ctx =
   newDatum ctx == (tok , insert from (vF - val) (insert to (vT + val) map))
 \end{code}
 }
+
 
 
 \newcommand\accPragmaTwo{%
@@ -274,11 +267,13 @@ checkTransfer tok (Just vF) (Just vT) from to val map ctx =
 }
 
 
+
+
 \newcommand\accVal{%
 \begin{code}
-agdaValidator : Params -> Datum -> Redeemer -> ScriptContext -> Bool
-agdaValidator par (tok , map) red ctx = checkTokenIn tok ctx &&
-  (case red of λ where
+agdaValidator : Datum -> Redeemer -> ScriptContext -> Bool
+agdaValidator (tok , map) red ctx = checkTokenIn tok ctx &&
+                                    (case red of λ where
 \end{code}
 }
 
@@ -359,9 +354,8 @@ checkValue addr tn ctx = checkTokenOutAddr addr (ownAssetClass tn ctx) ctx &&
 
 \newcommand\accPolicy{%
 \begin{code}
-agdaPolicy : Params -> Address -> TxOutRef -> TokenName
-  -> ⊤ -> ScriptContext -> Bool
-agdaPolicy par addr oref tn _ ctx =
+agdaPolicy : Address -> TxOutRef -> TokenName -> ⊤ -> ScriptContext -> Bool
+agdaPolicy addr oref tn _ ctx =
   if      amt == 1  then continuingAddr addr ctx && consumes oref ctx &&
                          checkDatum addr tn ctx && checkValue addr tn ctx
   else if amt == -1 then not (continuingAddr addr ctx)
@@ -382,15 +376,15 @@ agdaPolicy par addr oref tn _ ctx =
 {-# COMPILE AGDA2HS agdaPolicy #-}
 
 
-{-# COMPILE AGDA2HS Label #-}
+{-# COMPILE AGDA2HS AccMap #-}
 {-# COMPILE AGDA2HS Datum #-}
 \end{code}
 
 \newcommand\accSkeleton{%
 \begin{code}
-agdaValidator' : Params -> Datum -> Redeemer -> ScriptContext -> Bool
-agdaValidator' par (tok , map) red ctx = checkTokenIn tok ctx &&
-  (case red of λ where
+agdaValidator' : Datum -> Redeemer -> ScriptContext -> Bool
+agdaValidator' (tok , map) red ctx = checkTokenIn tok ctx &&
+                                    (case red of λ where
     (Open pkh) -> True
     (Close pkh) -> True
     (Withdraw pkh val) -> True
