@@ -14,7 +14,7 @@ TokenName = Nat
 PubKeyHash = Nat 
 Address = Nat
 TxOutRef = Nat
-AssetClass = (TokenName × CurrencySymbol)
+AssetClass = (CurrencySymbol × TokenName)
 \end{code}
 }
 
@@ -31,7 +31,7 @@ open POSIXTime public
 toPOSIXTime : Integer -> POSIXTime
 toPOSIXTime t = record { getPOSIXTime = t }
 
-Interval = (POSIXTime × POSIXTime)
+POSIXTimeRange = (POSIXTime × POSIXTime)
 \end{code}
 }
 
@@ -39,7 +39,7 @@ Interval = (POSIXTime × POSIXTime)
 
 \newcommand\libBefore{%
 \begin{code}
-before : POSIXTime -> Interval -> Bool
+before : POSIXTime -> POSIXTimeRange -> Bool
 before record { getPOSIXTime = time } (start , end)
   = time < (getPOSIXTime start)
 \end{code}
@@ -48,7 +48,7 @@ before record { getPOSIXTime = time } (start , end)
 
 \newcommand\libAfter{%
 \begin{code}
-after : POSIXTime -> Interval -> Bool
+after : POSIXTime -> POSIXTimeRange -> Bool
 after record { getPOSIXTime = time } (start , end)
   = time > (getPOSIXTime end)
 \end{code}
@@ -67,7 +67,7 @@ ada = (0 , 0)
 \newcommand\libMap{%
 \begin{code}
 data Map (k v : Set) : Set where
- unMap : List (k × v) -> Map k v
+  unMap : List (k × v) -> Map k v
 \end{code}
 }
 
@@ -97,9 +97,21 @@ ltRational b c = numerator b * denominator c < numerator c * denominator b
 
 \newcommand\libInstance{%
 \begin{code}
-
 instance
   iEqRational : Eq Rational
   iEqRational ._==_ = eqRational
 \end{code}
 }
+
+\newcommand\libComment{%
+\begin{code}
+--record Map (k v : Set) : Set where
+--    constructor mkMap
+--    field
+--        unMap : List (k × v)
+--open Map public
+\end{code}
+}
+
+
+

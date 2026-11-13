@@ -90,11 +90,6 @@ t=t (cs , tn) rewrite n=n cs | n=n tn = refl
 
 \begin{code}[hide]
 
-test : ∀ (a b c d e : Bool) -> ((a && b && (c && d) && e) ≡ true) -> d ≡ true
-test a b c d e ex = go c (get (go b (go a ex)))
-
-sub : ∀ {a b c : ℤ} -> a ≡ b -> a ≡ c -> b ≡ c
-sub refl refl = refl
 
 monusLT : ∀ (a b : Nat) -> ltNat a b ≡ true -> Internal.subNat a b ≡ - (+ monusNat b a)
 monusLT zero (N.suc b) pf = refl

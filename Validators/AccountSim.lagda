@@ -21,15 +21,25 @@ Datum = (AssetClass × Label)
 record ScriptContext : Set where
     field     
         inputVal         : Value
+--The value of the smart contract going into the transaction        
         outputVal        : Value
+--The value of the smart contract coming out of the transaction
         outputDatum      : Datum
+--The datum of the smart contract coming out of the transaction        
         payments         : List (PubKeyHash × Value)
+--A list of any relevant value payments and who they are addressed to        
         signature        : PubKeyHash
+--The signatory for the current transaction        
         continues        : Bool
+--A boolean representing whether the smart contract has self-propagated        
         inputRef         : TxOutRef
+--The reference of an input consumed in this transaction        
         mint             : Integer
+--How many tokens are being minted        
         tokCurrSymbol    : CurrencySymbol
-        validInterval    : Interval
+--The currency symbol of the token being minted        
+        validInterval    : POSIXTimeRange
+--The validity interval for this transaction
 \end{code}
 }
 
@@ -135,7 +145,7 @@ newValueAddr adr ctx = newValue ctx
 checkPayment : PubKeyHash -> Value -> ScriptContext -> Bool
 checkPayment pkh v ctx = getPayment pkh ctx == v
 
-validRange : ScriptContext -> Interval
+validRange : ScriptContext -> POSIXTimeRange
 validRange ctx = ScriptContext.validInterval ctx
 
 -- The type of the Plinth Redeemer, referred to as Input in Agda
@@ -146,8 +156,8 @@ validRange ctx = ScriptContext.validInterval ctx
 data Redeemer : Set where
   Open      : PubKeyHash -> Redeemer
   Close     : PubKeyHash -> Redeemer
-  Withdraw  : PubKeyHash -> Value -> Redeemer
   Deposit   : PubKeyHash -> Value -> Redeemer
+  Withdraw  : PubKeyHash -> Value -> Redeemer
   Transfer  : PubKeyHash -> PubKeyHash -> Value -> Redeemer
   Stop      : Redeemer
 \end{code}

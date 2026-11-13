@@ -69,7 +69,7 @@ record State : Set where
     datum       : Datum
     value       : Value  
     outVal      : Value
-    interval    : Interval
+    interval    : POSIXTimeRange
     tsig        : PubKeyHash
     spends      : TxOutRef
     threadTokCS : CurrencySymbol
@@ -294,16 +294,16 @@ insertPreservesUniqueness {sig} {(x ∷ xs)} (p :: ps) with sig == x in eq
 ...| false = (λ z → p (insertPreserves∈ z eq)) :: (insertPreservesUniqueness ps)
 ...| true = p :: ps
 
-noDupsLemma : ∀ {x : PubKeyHash} {ys : List PubKeyHash} ->
+noDupsLem : ∀ {x : PubKeyHash} {ys : List PubKeyHash} ->
   not (elem x ys) ≡ true -> x ∉ ys
-noDupsLemma {x} {[]} p = λ ()
-noDupsLemma {x} {y ∷ ys} p with x == y in eq
+noDupsLem {x} {[]} p = λ ()
+noDupsLem {x} {y ∷ ys} p with x == y in eq
 ...| True = ⊥-elim (get⊥ (sym p))
-...| False = λ { (here refl) → ⊥-elim (n≠n x eq) ; (there z) → noDupsLemma p z}
+...| False = λ { (here refl) → ⊥-elim (n≠n x eq) ; (there z) → noDupsLem p z}
 
 noDups->Unique [] p = root
 noDups->Unique (x ∷ []) p = (λ ()) :: root
-noDups->Unique (x ∷ y ∷ l) p = (noDupsLemma (get p)) :: noDups->Unique (y ∷ l) (go (not (elem x (y ∷ l))) p)
+noDups->Unique (x ∷ y ∷ l) p = (noDupsLem (get p)) :: noDups->Unique (y ∷ l) (go (not (elem x (y ∷ l))) p)
 
 --State Validity Invariants
 \end{code}
@@ -377,12 +377,12 @@ finalSig base (pkh1 ∷ pkh2 ∷ ls) = finalSig base (pkh2 ∷ ls)
 
 \newcommand\msPropLemmas{%
 \begin{code}
-appendLemma : ∀ (x : PubKeyHash) (a b : List PubKeyHash)
+appendLem : ∀ (x : PubKeyHash) (a b : List PubKeyHash)
   -> a ++ x ∷ b ≡ (a ++ x ∷ []) ++ b
 
 ∈lemma : ∀ (xs ys : List PubKeyHash) (z : PubKeyHash) -> z ∈ (xs ++ z ∷ ys)
 
-finalSigLemma : ∀ (pkh x : PubKeyHash) (xs : List PubKeyHash)
+finalSigLem : ∀ (pkh x : PubKeyHash) (xs : List PubKeyHash)
   -> finalSig pkh (x ∷ xs) ≡ finalSig x xs
 \end{code}
 }
@@ -414,8 +414,8 @@ prop {v} {pkh} {d} {sigs} {tok} s1 s2 par
   refl refl refl refl refl refl refl refl refl refl
   = cons (TAdd (∈lemma asigs1 asigs2 x) refl refl refl refl)
     (prop s' s2 par (asigs1 ++ x ∷ asigs2) (asigs1 ++ [ x ]) asigs2 refl
-    (appendLemma x asigs1 asigs2) refl refl refl refl refl refl refl
-    (finalSigLemma (tsig s1) x asigs2))
+    (appendLem x asigs1 asigs2) refl refl refl refl refl refl refl
+    (finalSigLem (tsig s1) x asigs2))
     where
       s' = record
             { datum = tok , Collecting v pkh d (insert x sigs)
@@ -452,17 +452,17 @@ prop1 s s' par p1 p2 p3 p4 p5 p6 p7 p8  = prop s s' par
 
 
 
-appendLemma x [] b = refl
-appendLemma x (a ∷ as) b = cong (λ y → a ∷ y) (appendLemma x as b) 
+appendLem x [] b = refl
+appendLem x (a ∷ as) b = cong (λ y → a ∷ y) (appendLem x as b) 
 
 
 ∈lemma [] ys z = here refl
 ∈lemma (x ∷ xs) ys z = there (∈lemma xs ys z)
 
 
-finalSigLemma pkh x [] = refl
-finalSigLemma pkh x (y ∷ []) = refl
-finalSigLemma pkh x (y ∷ z ∷ xs) = finalSigLemma pkh x (z ∷ xs)
+finalSigLem pkh x [] = refl
+finalSigLem pkh x (y ∷ []) = refl
+finalSigLem pkh x (y ∷ z ∷ xs) = finalSigLem pkh x (z ∷ xs)
 
 --Generalized Prop1 (Can add signatures 1 by 1)
 --Actual Prop1 (Can add all signatures 1 by 1)
@@ -547,13 +547,13 @@ uil : ∀ (l1 l2 : List PubKeyHash) (pf : Unique l1)
 
 \newcommand\msMSLemma{%
 \begin{code}
-lemmaMultiStep : ∀ (par : MParams) (s s' s'' : State) (is is' : List Redeemer)
+multiStepLem : ∀ (par : MParams) (s s' s'' : State) (is is' : List Redeemer)
                    -> par ⊢ s  ~[ is  ]~* s'
                    -> par ⊢ s' ~[ is' ]~* s''
                    -> par ⊢ s  ~[ is ++ is' ]~* s''
-lemmaMultiStep par s .s s'' [] is' nil p2 = p2
-lemmaMultiStep par s s' s'' (x ∷ is) is' (cons {s' = s'''} p1 p2) p3
-  = cons p1 (lemmaMultiStep par s''' s' s'' is is' p2 p3)
+multiStepLem par s .s s'' [] is' nil p2 = p2
+multiStepLem par s s' s'' (x ∷ is) is' (cons {s' = s'''} p1 p2) p3
+  = cons p1 (multiStepLem par s''' s' s'' is is' p2 p3)
 \end{code}
 }
 
@@ -572,7 +572,7 @@ uil l1 l2 pf = unique-lem (insertList-lem l1 l2) pf
 
 \newcommand\msLiqLem{%
 \begin{code}
-liqLemma : ∀ { v pkh d sigs tok } (s s' : State) (par : MParams)
+liqLem : ∀ { v pkh d sigs tok } (s s' : State) (par : MParams)
           -> valid s -> validP par
           -> datum s ≡ (tok , Collecting v pkh d sigs)
           -> datum s' ≡ (tok , Holding)
@@ -585,11 +585,11 @@ liqLemma : ∀ { v pkh d sigs tok } (s s' : State) (par : MParams)
 
 \newcommand\msLiqLemP{%
 \begin{code}
-liqLemma {v} {pkh} {d} {sigs} {tok}
+liqLem {v} {pkh} {d} {sigs} {tok}
   s1@record { datum = .(tok , Collecting oV sig d sigs) }
   s2@record { outVal = oV ; tsig = sig } par (Col p1 p2 p3 p4)
   (p5 , p6 , p7) refl refl refl refl refl
-  = lemmaMultiStep par s1 s' s2 (makeIs (authSigs par)) [ Pay ]
+  = multiStepLem par s1 s' s2 (makeIs (authSigs par)) [ Pay ]
     (prop1 s1 s' par refl refl refl refl refl refl refl refl)
     (cons (TPay (N.≤-trans p6 (uil (authSigs par) sigs p5))
     refl refl refl refl) nil)
@@ -615,7 +615,7 @@ rewriteValue a b rewrite assocVal a (negValue b) b
   
 rewriteGeq : ∀ (a b : Value)
   -> geq a ((a + (negValue b)) + b) ≡ true
-rewriteGeq a b rewrite rewriteValue a b = geq-refl a
+rewriteGeq a b rewrite rewriteValue a b = geqRefl a
 
 rewriteValue' : ∀ (a b : Value)
   -> b + (a + (negValue b)) ≡ a
@@ -673,7 +673,7 @@ liquidity par s@record { datum = (tok , Holding) ; value = value }
              (geqSub value minValue minValue (lovelaceLemma value
              (ltIntFalseToGeq (lovelaces value) (pos 6) eq)))
              refl refl refl (beforeLemma (maxWait par) p4))
-             (liqLemma s' s'' par (Col refl (rewriteGeq value minValue) 
+             (liqLem s' s'' par (Col refl (rewriteGeq value minValue) 
              (geqSub value minValue minValue (lovelaceLemma value
              (ltIntFalseToGeq (lovelaces value) (pos 6) eq))) root) p
              refl refl refl (sym (rewriteValue' value minValue)) refl))
@@ -721,7 +721,7 @@ liquidity par record { datum = (tok , Collecting v' pkh' d' sigs') ;
     (geqSub value minValue minValue
     (geqAddTrans value v' minValue minValue p2 p3)) refl refl refl
     (beforeLemma (maxWait par) p9))
-    (liqLemma s'' s''' par (Col refl (rewriteGeq value minValue)
+    (liqLem s'' s''' par (Col refl (rewriteGeq value minValue)
     (geqSub value minValue minValue
     (geqAddTrans value v' minValue minValue p2 p3)) root) p
     refl refl refl (sym (rewriteValue' value minValue)) refl)))
@@ -769,7 +769,7 @@ minValLiquidity par s@record { datum = (tok , Holding) ; value = value ; outVal 
              (cons (TPropose (rewriteGeq value minValue)
              (geqSub value minValue minValue (lovelaceLemma value (ltIntFalseToGeq (lovelaces value) (pos 6) eq)))
              refl refl refl
-             (beforeLemma (maxWait par) p4)) (liqLemma s' s'' par (Col refl (rewriteGeq value minValue) 
+             (beforeLemma (maxWait par) p4)) (liqLem s' s'' par (Col refl (rewriteGeq value minValue) 
              (geqSub value minValue minValue (lovelaceLemma value (ltIntFalseToGeq (lovelaces value) (pos 6) eq))) root) p
              refl refl refl (sym (rewriteValue' value minValue)) refl) , refl ) ⟩ ⟩
      where
@@ -798,7 +798,7 @@ minValLiquidity par record { datum = (tok , Collecting v' pkh' d' sigs') ; value
              (cons {s' = s'} (TCancel (ltIntegerLemma d') refl refl refl) (cons
              (TPropose (rewriteGeq value minValue)
              (geqSub value minValue minValue (geqAddTrans value v' minValue minValue p2 p3)) refl refl refl
-             (beforeLemma (maxWait par) p9)) (liqLemma s'' s''' par (Col refl (rewriteGeq value minValue)
+             (beforeLemma (maxWait par) p9)) (liqLem s'' s''' par (Col refl (rewriteGeq value minValue)
              (geqSub value minValue minValue (geqAddTrans value v' minValue minValue p2 p3)) root) p
              refl refl refl (sym (rewriteValue' value minValue)) refl)) , refl) ⟩ ⟩ 
     where

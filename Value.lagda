@@ -203,18 +203,20 @@ postulate
 
 \newcommand\vSumLem{%
 \begin{code}
+postulate
   sumLemma : ∀ (a b : Value)
            -> geq a emptyValue ≡ True
            -> geq b emptyValue ≡ True
-           -> geq (addValue a b) emptyValue ≡ True
+           -> geq (a + b) emptyValue ≡ True
 \end{code}
 }
 
 \newcommand\vDiffLem{%
 \begin{code}
+postulate
   diffLemma : ∀ (a b : Value)
             -> geq a b ≡ True
-            -> geq (subValue a b) emptyValue ≡ True
+            -> geq (a - b) emptyValue ≡ True
 \end{code}
 }
 
@@ -222,6 +224,7 @@ postulate
 
 \newcommand\vValID{%
 \begin{code}
+postulate
   addValIdL : ∀ (a : Value) -> emptyValue + a ≡ a
   addValIdR : ∀ (a : Value) -> a + emptyValue ≡ a
 \end{code}
@@ -230,7 +233,8 @@ postulate
 
 \newcommand\vDN{%
 \begin{code}
-  v-v : ∀ (a : Value) -> subValue a a ≡ emptyValue
+postulate
+  v-v : ∀ (a : Value) -> a - a ≡ emptyValue
 \end{code}
 }
 
@@ -238,7 +242,8 @@ postulate
 
 \newcommand\vGEQRefl{%
 \begin{code}
-  geq-refl : ∀ (a : Value) -> geq a a ≡ True
+postulate
+  geqRefl : ∀ (a : Value) -> geq a a ≡ True
 \end{code}
 }
 
@@ -253,13 +258,13 @@ postulate
   geqTrans : ∀ (a b c : Value) -> geq a b ≡ True -> geq b c ≡ True -> geq a c ≡ True
 
   geqAddTrans : ∀ (a b c d : Value)
-              -> geq a (addValue b c) ≡ True
+              -> geq a (b + c) ≡ True
               -> geq b d ≡ True
-              -> geq a (addValue d c) ≡ True
+              -> geq a (d + c) ≡ True
 
   geqSub : ∀ (a b c : Value)
-         -> geq a (addValue b c) ≡ True
-         -> geq (subValue a b) c ≡ True
+         -> geq a (b + c) ≡ True
+         -> geq (a - b) c ≡ True
          
   lovelaceLemma : ∀ (a : Value) 
                         -> (lovelaces a >= lovelaces x2MinValue) ≡ True

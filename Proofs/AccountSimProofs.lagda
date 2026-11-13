@@ -14,10 +14,11 @@ open import Agda.Builtin.Nat renaming (_==_ to eqNat; _<_ to ltNat; _+_ to addNa
 open import Data.List hiding (lookup)
 open import Relation.Nullary
 open import Relation.Binary.PropositionalEquality.Core
+open import Data.List.Relation.Unary.All hiding (lookup)
 open import Data.Empty
 open import Data.Sum.Base
 open import Data.Product using (∃; ∃-syntax; proj₁; proj₂) renaming (_,_ to ⟨_,_⟩; _×_ to _xx_)
-open import Haskell.Prim hiding (⊥) 
+open import Haskell.Prim hiding (⊥; All) 
 open import Haskell.Prim.Integer
 open import Haskell.Prim.Bool
 open import Haskell.Prim.Eq
@@ -80,12 +81,13 @@ open MParams public
 data _⊢_ : MParams -> State -> Set
   where
   TStart : ∀ {par s}
-    -> datum s ≡ ((threadTokCS s , threadTokName par) , [] )
+    -> let threadToken = (threadTokCS s , threadTokName par) in
+       datum s ≡ (threadToken , [] )
     -> spends s ≡ uniqueId par 
-    -> value s ≡ minValue + assetClassValue
-                (threadTokCS s , threadTokName par) 1
+    -> value s ≡ minValue + assetClassValue threadToken 1
     -------------------
     -> par ⊢ s
+      
 \end{code}
 }
 
@@ -173,12 +175,23 @@ data _⊢_~[_]~>_ : MParams -> State -> Redeemer -> State -> Set
 \end{code}
 }
 
+\newcommand\mHelper{%
+\begin{code}
+threadToken : State -> AssetClass
+threadToken s = s .datum .fst
+
+accMap : State -> Label
+accMap s = s .datum .snd
+\end{code}
+}
+
+
 \newcommand\mFinal{%
 \begin{code}
 data _⊢_~[_]~|_ : MParams -> State -> Redeemer -> State -> Set
   where
   TStop : ∀ {par s s'}
-    -> snd (datum s) ≡ []
+    -> accMap s ≡ []
     -------------------
     -> par ⊢ s ~[ Stop ]~| s'
 \end{code}
@@ -215,6 +228,8 @@ data _⊢_~[_]~*_ : MParams -> State -> List Redeemer -> State -> Set
 
 \end{code}
 
+
+
 \newcommand\mMultiF{%
 \begin{code}
 data _⊢_~[_]~|*_ : MParams -> State -> List Redeemer -> State -> Set
@@ -238,15 +253,6 @@ data _⊢_~[_]~|*_ : MParams -> State -> List Redeemer -> State -> Set
 
 \end{code}
 
-\newcommand\mHelper{%
-\begin{code}
-threadToken : State -> AssetClass
-threadToken s = s .datum .fst
-
-accMap : State -> Label
-accMap s = s .datum .snd
-\end{code}
-}
 
 \begin{code}[hide]
 
@@ -264,7 +270,7 @@ valid s = All (\y -> geq (snd y) emptyValue ≡ true) (accMap s)
 \newcommand\mValidParam{%
 \begin{code}
 validP : MParams -> Set 
-validP par = true ≡ true
+validP par = ⊤
 \end{code}
 }
 
@@ -285,10 +291,30 @@ lem : ∀ {pkh} (map : Label) (v : Value)
 
 \newcommand\mLemP{%
 \begin{code}
-lem {pkh} [] v' p1 p2 = allCons {{p1}}
-lem {pkh} ((pkh' , v) ∷ map) v' p1 (allCons {{i}} {{is}}) with pkh == pkh'
-...| true = allCons {{p1}}
-...| false = allCons {{i}} {{lem map v' p1 is}}
+lem {pkh} [] v p1 p2 = p1 ∷ []
+lem {pkh} ((pkh' , v') ∷ map) v p1 (px ∷ pxs) with pkh == pkh'
+...| true = p1 ∷ pxs
+...| false = px ∷ (lem map v p1 pxs)
+\end{code}
+}
+
+
+\newcommand\mLemp{%
+\begin{code}
+lem' : ∀ {pkh} (map : Label) (v : Value)
+      -> geq v emptyValue ≡ true 
+      -> All (λ y → geq (snd y) emptyValue ≡ true) map
+      -> All (λ y → geq (snd y) emptyValue ≡ true) (insert pkh v map)
+\end{code}
+}
+
+\newcommand\mLemPpp{%
+\begin{code}
+lem' {pkh} [] v p1 p2 = p1 ∷ []
+lem' {pkh} ((pkh' , v') ∷ map) v p1 (px ∷ pxs) with pkh == pkh'
+lem' {pkh} ((pkh' , v') ∷ map) v p1 (px ∷ pxs) | true = p1 ∷ pxs
+lem' {pkh} ((pkh' , v') ∷ map) v p1 (px ∷ pxs) | false
+  = px ∷ (lem' map v p1 pxs)
 \end{code}
 }
 
@@ -297,15 +323,16 @@ lem {pkh} ((pkh' , v) ∷ map) v' p1 (allCons {{i}} {{is}}) with pkh == pkh'
 delem : ∀ {pkh} (map : Label)
       -> All (λ y → geq (snd y) emptyValue ≡ true) map
       -> All (λ y → geq (snd y) emptyValue ≡ true) (delete pkh map)
+delem {pkh} [] p = p
+delem {pkh} ((pkh' , v') ∷ map) (px ∷ pxs) with pkh == pkh'
+...| true = pxs
+...| false = px ∷ (delem map pxs)
 \end{code}
 }
 
 \newcommand\mDelemP{%
 \begin{code}
-delem {pkh} [] p1 = allNil
-delem {pkh} ((pkh' , v') ∷ map) (allCons {{i}} {{is}}) with pkh == pkh'
-...| true = is 
-...| false = allCons {{i}} {{delem map is}}
+
 \end{code}
 }
 
@@ -322,10 +349,9 @@ geqLem : ∀ {pkh} (map : Label) (v : Value)
 \newcommand\mGeqlemP{%
 \begin{code}
 geqLem {pkh} ((pkh' , v') ∷ map) v p1 p2 with pkh == pkh'
-geqLem {pkh} ((pkh' , v') ∷ map) v
-  (allCons {{i}} {{is}}) refl | true = i
-geqLem {pkh} ((pkh' , v') ∷ map) v
-  (allCons {{i}} {{is}}) p2 | false = geqLem map v is p2
+geqLem {pkh} ((pkh' , v') ∷ map) v (px ∷ pxs) refl | true = px
+geqLem {pkh} ((pkh' , v') ∷ map) v (px ∷ pxs) p2   | false
+  = geqLem map v pxs p2
 \end{code}
 }
 
@@ -335,8 +361,7 @@ geqLem {pkh} ((pkh' , v') ∷ map) v
 initialValidity : ∀ {s par}
   -> par ⊢ s
   -> valid s 
-initialValidity {record { datum = tok , [] }}
-                (TStart refl p2 p3) = allNil
+initialValidity (TStart refl p2 p3) = []
 \end{code}
 }
 
@@ -345,7 +370,7 @@ initialValidity {record { datum = tok , [] }}
 initialValidityP : ∀ {s par}
   -> par ⊢ s
   -> validP par 
-initialValidityP pf = refl
+initialValidityP pf = tt
 \end{code}
 }
 
@@ -361,28 +386,23 @@ validity : ∀ {s s' i par}
 
 \newcommand\mValOpen{%
 \begin{code}
-validity {record { datum = tok , map }}
-         {record { datum = .(_ , insert _ emptyValue map) }} p
-         (TOpen refl p2 p3 refl p5)
-         = (lem map emptyValue refl p)
+validity {s} p (TOpen refl p2 p3 refl p5)
+         = (lem (accMap s) emptyValue refl p)
 \end{code}
 }
 
 
 \newcommand\mValClose{%
 \begin{code}
-validity {record { datum = tok , map }}
-         {record { datum = .(_ , delete _ map) }} p
-         (TClose refl p2 p3 refl p5) = (delem map p)
+validity {s} p (TClose refl p2 p3 refl p5)
+         = (delem (accMap s) p)
 \end{code}
 }
 
 \newcommand\mValDeposit{%
 \begin{code}
-validity {record { datum = tok , map }}
-         {record { datum = .(_ , insert _ (v + val) map) }} p
-         (TDeposit {val = val} {v = v} refl p2 p3 p4 refl p6)
-         = lem map (v + val)
+validity {s} p (TDeposit {val = val} {v = v} refl p2 p3 p4 refl p6)
+         = let map = accMap s in lem map (v + val)
            (sumLemma v val (geqLem map v p p3) p4) p
 \end{code}
 
@@ -390,21 +410,17 @@ validity {record { datum = tok , map }}
 
 \newcommand\mValWithdraw{%
 \begin{code}
-validity {record { datum = tok , map }}
-         {record { datum = .(_ , insert _ (v - val) map) }} p
-         (TWithdraw {val = val} {v = v} refl p2 p3 p4 p5 refl refl)
-         = (lem map (v - val) (diffLemma v val p5) p)
+validity {s} p (TWithdraw {val = val} {v = v} refl p2 p3 p4 p5 refl refl)
+         = lem (accMap s) (v - val) (diffLemma v val p5) p
 \end{code}
 }
 
 \newcommand\mValTransfer{%
 \begin{code}
-validity {record { datum = tok , map }}
-         {record { datum = .(_ , insert from (vF - val)
-                                (insert to (vT + val) map)) }} p
-         (TTransfer {par} {from} {to} {val} {vF = vF} {vT = vT}
-                    refl p2 p3 p4 p5 p6 p7 refl p9)
-         = lem (insert to (vT + val) map) (vF - val) (diffLemma vF val p6)
+validity {s} p (TTransfer {par} {from} {to} {val} {vF = vF} {vT = vT}
+         refl p2 p3 p4 p5 p6 p7 refl p9)
+         = let map = accMap s in
+           lem (insert to (vT + val) map) (vF - val) (diffLemma vF val p6)
            (lem map (vT + val) (sumLemma vT val (geqLem map vT p p4) p5) p)
 \end{code}
 } 
@@ -495,7 +511,7 @@ maybe≡ refl = refl
 
 \newcommand\mIValOne{%
 \begin{code}
-iValLemma1 : ∀ {pkh} (map : Label) (ac : AssetClass)
+iValLem1 : ∀ {pkh} (map : Label) (ac : AssetClass)
            -> lookup pkh map ≡ Nothing
            -> iVal map ac ≡ iVal (insert pkh emptyValue map) ac
 \end{code}
@@ -503,16 +519,16 @@ iValLemma1 : ∀ {pkh} (map : Label) (ac : AssetClass)
 
 \newcommand\mIValOnep{%
 \begin{code}
-iValLemma1 {pkh} [] ac p = refl
-iValLemma1 {pkh} ((pkh' , v') ∷ map) ac p with pkh == pkh'
-...| false = cong (λ a → v' + a) (iValLemma1 map ac p)
+iValLem1 {pkh} [] ac p = refl
+iValLem1 {pkh} ((pkh' , v') ∷ map) ac p with pkh == pkh'
+...| false = cong (λ a → v' + a) (iValLem1 map ac p)
 ...| true = ⊥-elim (maybe⊥ (sym p))
 \end{code}
 }
 
 \newcommand\mIValTwo{%
 \begin{code}
-iValLemma2 : ∀ {pkh} (map : Label) (ac : AssetClass)
+iValLem2 : ∀ {pkh} (map : Label) (ac : AssetClass)
            -> lookup pkh map ≡ Just emptyValue
            -> iVal map ac ≡ iVal (delete pkh map) ac
 \end{code}
@@ -520,16 +536,16 @@ iValLemma2 : ∀ {pkh} (map : Label) (ac : AssetClass)
 
 \newcommand\mIValTwop{%
 \begin{code}
-iValLemma2 [] ac p = refl
-iValLemma2 {pkh} ((pkh' , v') ∷ map) ac p with pkh == pkh'
-...| false = cong (λ a → v' + a) (iValLemma2 map ac p)
+iValLem2 [] ac p = refl
+iValLem2 {pkh} ((pkh' , v') ∷ map) ac p with pkh == pkh'
+...| false = cong (λ a → v' + a) (iValLem2 map ac p)
 ...| true rewrite maybe≡ p = addValIdL (iVal map ac)
 \end{code}
 }
 
 \newcommand\mIValThree{%
 \begin{code}
-iValLemma3 : ∀ {pkh v val} (map : Label) (ac : AssetClass)
+iValLem3 : ∀ {pkh v val} (map : Label) (ac : AssetClass)
            -> lookup pkh map ≡ Just v
            -> (iVal map ac) + val ≡
               iVal (insert pkh (v + val) map) ac
@@ -538,10 +554,10 @@ iValLemma3 : ∀ {pkh v val} (map : Label) (ac : AssetClass)
 
 \newcommand\mIValThreep{%
 \begin{code}
-iValLemma3 [] ac p = ⊥-elim (maybe⊥ p) 
-iValLemma3 {pkh} {v} {val} ((pkh' , v') ∷ map) ac p with pkh == pkh'
+iValLem3 [] ac ()
+iValLem3 {pkh} {v} {val} ((pkh' , v') ∷ map) ac p with pkh == pkh'
 ...| false rewrite (assocVal v' (iVal map ac) val)
-     = cong (λ a → v' + a) (iValLemma3 map ac p)
+     = cong (λ a → v' + a) (iValLem3 map ac p)
 ...| true rewrite maybe≡ p | assocVal v (iVal map ac) val
                 | commVal (iVal map ac) val
                 | assocVal v val (iVal map ac) = refl
@@ -550,7 +566,7 @@ iValLemma3 {pkh} {v} {val} ((pkh' , v') ∷ map) ac p with pkh == pkh'
 
 \newcommand\mIValFour{%
 \begin{code}
-iValLemma4 : ∀ {from to vF vT val} (map : Label) (ac : AssetClass)
+iValLem4 : ∀ {from to vF vT val} (map : Label) (ac : AssetClass)
            -> lookup from map ≡ Just vF
            -> lookup to map ≡ Just vT
            -> from ≢ to
@@ -561,35 +577,27 @@ iValLemma4 : ∀ {from to vF vT val} (map : Label) (ac : AssetClass)
 
 \newcommand\mIValFourp{%
 \begin{code}
-iValLemma4 {from} {to} {vF} {vT} {val} ((pkh , v) ∷ map) ac p1 p2 p3
+iValLem4 {from} {to} {vF} {vT} {val} ((pkh , v) ∷ map) ac p1 p2 p3
   with to == pkh in eq1
-iValLemma4 {from} {to} {vF} {vT} {val} ((pkh , v) ∷ map) ac p1 p2 p3
-  | true with from == to in eq2
-iValLemma4 {from} {to} {vF} {vT} {val} ((pkh , v) ∷ map) ac p1 p2 p3
-  | true | true = ⊥-elim (p3 (==to≡ from to eq2))
-iValLemma4 {from} {to} {vF} {vT} {val} ((pkh , v) ∷ map) ac p1 p2 p3
-  | true | false with from == pkh in eq3
-iValLemma4 {from} {to} {vF} {vT} {val} ((pkh , v) ∷ map) ac p1 p2 p3
-  | true | false | true 
-    rewrite ==to≡ to pkh eq1 | ==to≡ from pkh eq3 = ⊥-elim (p3 refl)
-iValLemma4 {from} {to} {vF} {vT} {val} ((pkh , v) ∷ map) ac p1 p2 p3
-  | true | false | false
-    rewrite assocVal vT val (iVal (insert from (vF - val) map) ac)
-    | (maybe≡ p2) | commVal val (iVal (insert from (vF - val) map) ac)
-    = cong (λ a → vT + a) (switchSides (iVal map ac) val
-    (iVal (insert from (vF - val) map) ac) (iValLemma3 map ac p1))
-iValLemma4 {from} {to} {vF} {vT} {val} ((pkh , v) ∷ map) ac p1 p2 p3
-  | false with from == pkh in eq2
-iValLemma4 {from} {to} {vF} {vT} {val} ((pkh , v) ∷ map) ac p1 p2 p3
-  | false | true
-    rewrite assocVal vF (negValue val) (iVal (insert to (vT + val) map) ac) 
-    | (maybe≡ p1) | commVal (negValue val) (iVal (insert to (vT + val) map) ac) 
-    = cong (λ a → vF + a) (switchSides' (iVal map ac) val
-    (iVal (insert to (vT + val) map) ac) (iValLemma3 map ac p2))
-iValLemma4 {from} {to} {vF} {vT} {val} ((pkh , v) ∷ map) ac p1 p2 p3
-  | false | false = cong (λ a → v + a) (iValLemma4 map ac p1 p2 p3)
+...| true with from == to in eq2
+...  | true = ⊥-elim (p3 (==to≡ from to eq2))
+...  | false with from == pkh in eq3
+...    | true rewrite ==to≡ to pkh eq1 | ==to≡ from pkh eq3 = ⊥-elim (p3 refl)
+...    | false rewrite assocVal vT val (iVal (insert from (vF - val) map) ac)
+         | (maybe≡ p2) | commVal val (iVal (insert from (vF - val) map) ac)
+         = cong (λ a → vT + a) (switchSides (iVal map ac) val
+           (iVal (insert from (vF - val) map) ac) (iValLem3 map ac p1))
+iValLem4 {from} {to} {vF} {vT} {val} ((pkh , v) ∷ map) ac p1 p2 p3
+   | false with from == pkh in eq2
+...  | true rewrite assocVal vF (negValue val)
+       (iVal (insert to (vT + val) map) ac) | (maybe≡ p1)
+       | commVal (negValue val) (iVal (insert to (vT + val) map) ac) 
+       = cong (λ a → vF + a) (switchSides' (iVal map ac) val
+         (iVal (insert to (vT + val) map) ac) (iValLem3 map ac p2))
+...  | false = cong (λ a → v + a) (iValLem4 map ac p1 p2 p3)
 \end{code}
 }
+
 
 
 \begin{code}[hide]
@@ -605,8 +613,7 @@ iValLemma4 {from} {to} {vF} {vT} {val} ((pkh , v) ∷ map) ac p1 p2 p3
 initialFidelity : ∀ {s par}
   -> par ⊢ s
   -> fides s
-initialFidelity {record { datum = .(_ , []) }}
-                (TStart refl p2 p3) = p3 
+initialFidelity (TStart refl p2 p3) = p3 
 \end{code}
 }
 
@@ -621,41 +628,41 @@ fidelity : ∀ {s s' i par}
 
 \newcommand\mFidOpen{%
 \begin{code}       
-fidelity {s@record { datum = tok , map }} {s'} refl
-         (TOpen refl p2 p3 refl refl)
-         rewrite iVal≡ s | iVal≡ s' = iValLemma1 map tok p3
+fidelity {s} {s'} refl (TOpen refl p2 p3 refl refl)
+         rewrite iVal≡ s | iVal≡ s'
+         = iValLem1 (accMap s) (threadToken s) p3
 \end{code}
 }
 
 \newcommand\mFidClose{%
 \begin{code}
-fidelity {s@record { datum = tok , map }} {s'} refl
-         (TClose refl p2 p3 refl refl)
-         rewrite iVal≡ s | iVal≡ s' = iValLemma2 map tok p3
+fidelity {s} {s'} refl (TClose refl p2 p3 refl refl)
+         rewrite iVal≡ s | iVal≡ s'
+         = iValLem2 (accMap s) (threadToken s) p3
 \end{code}
 }
 
 \newcommand\mFidDeposit{%
 \begin{code}
-fidelity {s@record { datum = tok , map }} {s'} refl
-         (TDeposit refl p2 p3 p4 refl refl) 
-         rewrite iVal≡ s | iVal≡ s' = iValLemma3 map tok p3
+fidelity {s} {s'} refl (TDeposit refl p2 p3 p4 refl refl) 
+         rewrite iVal≡ s | iVal≡ s'
+         = iValLem3 (accMap s) (threadToken s) p3
 \end{code}
 }
 
 \newcommand\mFidWithdraw{%
 \begin{code}
-fidelity {s@record { datum = tok , map }} {s'} refl
-         (TWithdraw refl p2 p3 p4 p5 refl refl)
-         rewrite iVal≡ s | iVal≡ s' = iValLemma3 map tok p3
+fidelity {s} {s'} refl (TWithdraw refl p2 p3 p4 p5 refl refl)
+         rewrite iVal≡ s | iVal≡ s'
+         = iValLem3 (accMap s) (threadToken s) p3
 \end{code}
 }
 
 \newcommand\mFidTransfer{%
 \begin{code}
-fidelity {s@record { datum = tok , map }} {s'} refl
-         (TTransfer refl p2 p3 p4 p5 p6 p7 refl refl)
-         rewrite iVal≡ s | iVal≡ s' = iValLemma4 map tok p3 p4 p7
+fidelity {s} {s'} refl (TTransfer refl p2 p3 p4 p5 p6 p7 refl refl)
+         rewrite iVal≡ s | iVal≡ s'
+         = iValLem4 (accMap s) (threadToken s) p3 p4 p7
 \end{code}
 }
 
@@ -714,8 +721,7 @@ makeIs ((pkh , v) ∷ map) = (Withdraw pkh v) ∷ (Close pkh) ∷ (makeIs map)
 \begin{code}
 lastSig : Label -> PubKeyHash -> PubKeyHash
 lastSig [] pkh = pkh
-lastSig ((pkh' , v') ∷ []) pkh = pkh'
-lastSig (x ∷ y ∷ map) pkh = lastSig (y ∷ map) pkh
+lastSig ((pkh' , v') ∷ map) pkh = lastSig map pkh'
 \end{code}
 }
 
@@ -724,18 +730,17 @@ lastSig (x ∷ y ∷ map) pkh = lastSig (y ∷ map) pkh
 sameLastSig : ∀ {x sig sig'} (map : Label)
              -> lastSig (x ∷ map) sig ≡ lastSig (x ∷ map) sig'
 sameLastSig [] = refl
-sameLastSig (y ∷ map) = sameLastSig map
+sameLastSig (y ∷ map) = refl
 \end{code}
 }
 
 
 \newcommand\mLSLemma{%
 \begin{code}
-lastSigLemma : ∀ {pkh v sig} (map : Label)
+lastSigLem : ∀ {pkh v sig} (map : Label)
               -> lastSig ((pkh , v) ∷ map) sig ≡ lastSig map pkh
-lastSigLemma [] = refl
-lastSigLemma (x ∷ []) = refl
-lastSigLemma (x ∷ y ∷ map) = sameLastSig map
+lastSigLem [] = refl
+lastSigLem (x ∷ map) = refl
 \end{code}
 }
 
@@ -772,8 +777,7 @@ rwLabel pkh val map rewrite (v-v val) = refl
 
 \newcommand\mRWVal{%
 \begin{code}
-rwVal : ∀ (v1 v2 : Value)
-            -> v1 ≡ (v2 + v1) - v2 
+rwVal : ∀ (v1 v2 : Value) -> v1 ≡ (v2 + v1) - v2 
 rwVal v1 v2 rewrite commVal v2 v1
             | assocVal v1 v2 (negValue v2)
             | v-v v2 = sym (addValIdR v1)
@@ -781,30 +785,9 @@ rwVal v1 v2 rewrite commVal v2 v1
 }
 
 
-\newcommand\mGetG{%
-\begin{code}
-getGeq : ∀ {x} (map : Label)
-  -> All (\y -> geq (snd y) emptyValue ≡ true) (x ∷ map)
-  -> geq (snd x) emptyValue ≡ true
-getGeq map (allCons {{i}} {{is}}) = i
-\end{code}
-}
-
-
-
-\newcommand\mGetV{%
-\begin{code}
-getValid : ∀ {x} (map : Label)
-  -> All (\y -> geq (snd y) emptyValue ≡ true) (x ∷ map)
-  -> All (\y -> geq (snd y) emptyValue ≡ true) map
-getValid map (allCons {{i}} {{is}}) = is
-\end{code}
-}
-
-
 \newcommand\mLiqLemma{%
 \begin{code}
-liqLemma : ∀ {tok} {map : Label} (s s' : State) {par}
+liqLem : ∀ {tok} {map : Label} (s s' : State) {par}
         -> datum s ≡ (tok , map)
         -> datum s' ≡ (tok , [])
         -> value s' ≡ minValue + assetClassValue tok 1
@@ -819,17 +802,17 @@ liqLemma : ∀ {tok} {map : Label} (s s' : State) {par}
 
 \newcommand\mLiqLemmap{%
 \begin{code}
-liqLemma record { datum = (tok , []) } s'
+liqLem record { datum = (tok , []) } s'
   refl refl refl refl refl refl refl p = nil
-liqLemma s@record { datum = (tok , (pkh , v) ∷ map') }
-      s' refl refl refl refl refl refl refl p
+liqLem s@record { datum = (tok , (pkh , v) ∷ map') }
+      s' refl refl refl refl refl refl refl (px ∷ pxs)
       = cons {s' = st} (TWithdraw refl refl (rwLookup (n=n pkh))
-        (getGeq map' p) (geq-refl v) (rwInsertDelete (n=n pkh)
+        px (geqRefl v) (rwInsertDelete (n=n pkh)
         (rwLabel pkh v map')) (rwVal (value st) v)) 
         (cons {s' = st'} (TClose refl refl (rwLookup (n=n pkh))
         (rwInsertDelete (n=n pkh) refl) refl )
-        (liqLemma st' s' refl refl refl (lastSigLemma map')
-        refl refl refl (getValid map' p)))        
+        (liqLem st' s' refl refl refl refl
+        refl refl refl pxs))        
 \end{code}
 }
 
@@ -871,7 +854,7 @@ liquidity : ∀ (s : State) (par : MParams)
 \begin{code}
 liquidity s par (p1 , p2) p3 rewrite iVal≡ s
   = ⟨ s'' , ⟨ (makeIs (accMap s) ++ [ Stop ]) ,
-    (fin (liqLemma s s' refl refl refl refl p2 refl refl p1)
+    (fin (liqLem s s' refl refl refl refl p2 refl refl p1)
     (TStop refl) ) ⟩ ⟩
 \end{code}
 }
@@ -916,7 +899,7 @@ minValLiquidity : ∀ (s : State) (par : MParams)
 \begin{code}
 minValLiquidity s par (p1 , p2) p3 rewrite iVal≡ s
   = ⟨ s' , ⟨ (makeIs (accMap s)) ,
-    ((liqLemma s s' refl refl refl refl p2 refl refl p1) , refl) ⟩ ⟩ 
+    ((liqLem s s' refl refl refl refl p2 refl refl p1) , refl) ⟩ ⟩ 
   where
   s' = record
        { datum = threadToken s , []
@@ -974,15 +957,13 @@ skipInsert pkh1 pkh2 [] p with pkh2 == pkh1 in eq
 ...| True = ⊥-elim (p (sym (==to≡ pkh2 pkh1 eq)))
 ...| False = refl
 skipInsert pkh1 pkh2 (x ∷ map') p with pkh2 == (x .fst) in eq1
-skipInsert pkh1 pkh2 (x ∷ map') p | True with pkh1 == (x .fst) in eq2
-skipInsert pkh1 pkh2 (x ∷ map') p | True | True
-  rewrite ==to≡ pkh2 (x .fst) eq1 | ==to≡ pkh1 (x .fst) eq2 = ⊥-elim (p refl)
-skipInsert pkh1 pkh2 (x ∷ map') p | True | False rewrite eq1 = refl
+...| True with pkh1 == (x .fst) in eq2
+...  | True rewrite ==to≡ pkh2 (x .fst) eq1
+            | ==to≡ pkh1 (x .fst) eq2 = ⊥-elim (p refl)
+...  | False rewrite eq1 = refl
 skipInsert pkh1 pkh2 (x ∷ map') p | False with pkh1 == (x .fst) in eq2
-skipInsert pkh1 pkh2 (x ∷ map') p | False | True 
-  rewrite sym (==to≡ pkh1 (x .fst) eq2) | eq1 = refl
-skipInsert pkh1 pkh2 (x ∷ map') p | False | False rewrite eq1
-  = skipInsert pkh1 pkh2 map' p        
+...  | True rewrite sym (==to≡ pkh1 (x .fst) eq2) | eq1 = refl
+...  | False rewrite eq1 = skipInsert pkh1 pkh2 map' p
 \end{code}
 }
 
@@ -1023,12 +1004,12 @@ rwDatum pkh v map rewrite v-v v = refl
 
 \newcommand\mLIL{%
 \begin{code}                           
-lookupInsertLemma : ∀ (pkh : PubKeyHash) (v : Value) (map : Label)
+lookupInsertLem : ∀ (pkh : PubKeyHash) (v : Value) (map : Label)
   -> lookup pkh (insert pkh v map) ≡ Just v
-lookupInsertLemma pkh v [] rewrite n=n pkh = refl
-lookupInsertLemma pkh v (x ∷ map') with pkh == x .fst in eq
+lookupInsertLem pkh v [] rewrite n=n pkh = refl
+lookupInsertLem pkh v (x ∷ map') with pkh == x .fst in eq
 ...| True rewrite n=n pkh = refl
-...| False rewrite eq = lookupInsertLemma pkh v map'
+...| False rewrite eq = lookupInsertLem pkh v map'
 \end{code}
 }
 
@@ -1036,8 +1017,7 @@ lookupInsertLemma pkh v (x ∷ map') with pkh == x .fst in eq
 
 \newcommand\mRecF{%
 \begin{code}                           
-userCanRecoverFunds :
-  ∀ {val par} (s : State) (pkh : PubKeyHash)
+userCanRecoverFunds : ∀ {val par} (s : State) (pkh : PubKeyHash)
   -> lookup pkh (accMap s) ≡ Just val
   -> invariant s
   -> ∃[ s' ] ((par ⊢ s ~[ Withdraw pkh val ]~> s')
@@ -1047,11 +1027,11 @@ userCanRecoverFunds :
 
 \newcommand\mRecFp{%
 \begin{code}                           
-userCanRecoverFunds {val} s@record { datum = (tok , map) ; value = v}
+userCanRecoverFunds {val} (record { datum = (tok , map) ; value = v})
   pkh p1 p2 = ⟨ s' , ((TWithdraw refl refl p1
               (geqLem map val (p2 .fst) p1)
-              (geq-refl val) (rwDatum pkh val map) refl) ,
-              lookupInsertLemma pkh emptyValue map) ⟩
+              (geqRefl val) (rwDatum pkh val map) refl) ,
+              lookupInsertLem pkh emptyValue map) ⟩
 \end{code}
 }
 
@@ -1063,8 +1043,7 @@ userCanRecoverFunds {val} s@record { datum = (tok , map) ; value = v}
         ; value = v - val
         ; tsig = pkh
         ; spends = 0
-        ; threadTokCS = 0
-        }
+        ; threadTokCS = 0 }
 \end{code}
 }
 

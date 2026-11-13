@@ -59,17 +59,23 @@
 \>[25]\AgdaSymbol{:}\AgdaSpace{}%
 \AgdaFunction{Value}\<%
 \\
-%
+\>[0]\AgdaComment{--The\ value\ of\ the\ smart\ contract\ going\ into\ the\ transaction\ \ \ \ \ \ \ \ }\<%
+\\
+\>[0][@{}l@{\AgdaIndent{0}}]%
 \>[8]\AgdaField{outputVal}%
 \>[25]\AgdaSymbol{:}\AgdaSpace{}%
 \AgdaFunction{Value}\<%
 \\
-%
+\>[0]\AgdaComment{--The\ value\ of\ the\ smart\ contract\ coming\ out\ of\ the\ transaction}\<%
+\\
+\>[0][@{}l@{\AgdaIndent{0}}]%
 \>[8]\AgdaField{outputDatum}%
 \>[25]\AgdaSymbol{:}\AgdaSpace{}%
 \AgdaFunction{Datum}\<%
 \\
-%
+\>[0]\AgdaComment{--The\ datum\ of\ the\ smart\ contract\ coming\ out\ of\ the\ transaction\ \ \ \ \ \ \ \ }\<%
+\\
+\>[0][@{}l@{\AgdaIndent{0}}]%
 \>[8]\AgdaField{payments}%
 \>[25]\AgdaSymbol{:}\AgdaSpace{}%
 \AgdaDatatype{List}\AgdaSpace{}%
@@ -77,35 +83,49 @@
 \AgdaOperator{\AgdaRecord{×}}\AgdaSpace{}%
 \AgdaFunction{Value}\AgdaSymbol{)}\<%
 \\
-%
+\>[0]\AgdaComment{--A\ list\ of\ any\ relevant\ value\ payments\ and\ who\ they\ are\ addressed\ to\ \ \ \ \ \ \ \ }\<%
+\\
+\>[0][@{}l@{\AgdaIndent{0}}]%
 \>[8]\AgdaField{signature}%
 \>[25]\AgdaSymbol{:}\AgdaSpace{}%
 \AgdaFunction{PubKeyHash}\<%
 \\
-%
+\>[0]\AgdaComment{--The\ signatory\ for\ the\ current\ transaction\ \ \ \ \ \ \ \ }\<%
+\\
+\>[0][@{}l@{\AgdaIndent{0}}]%
 \>[8]\AgdaField{continues}%
 \>[25]\AgdaSymbol{:}\AgdaSpace{}%
 \AgdaDatatype{Bool}\<%
 \\
-%
+\>[0]\AgdaComment{--A\ boolean\ representing\ whether\ the\ smart\ contract\ has\ self-propagated\ \ \ \ \ \ \ \ }\<%
+\\
+\>[0][@{}l@{\AgdaIndent{0}}]%
 \>[8]\AgdaField{inputRef}%
 \>[25]\AgdaSymbol{:}\AgdaSpace{}%
 \AgdaFunction{TxOutRef}\<%
 \\
-%
+\>[0]\AgdaComment{--The\ reference\ of\ an\ input\ consumed\ in\ this\ transaction\ \ \ \ \ \ \ \ }\<%
+\\
+\>[0][@{}l@{\AgdaIndent{0}}]%
 \>[8]\AgdaField{mint}%
 \>[25]\AgdaSymbol{:}\AgdaSpace{}%
 \AgdaDatatype{Integer}\<%
 \\
-%
+\>[0]\AgdaComment{--How\ many\ tokens\ are\ being\ minted\ \ \ \ \ \ \ \ }\<%
+\\
+\>[0][@{}l@{\AgdaIndent{0}}]%
 \>[8]\AgdaField{tokCurrSymbol}%
 \>[25]\AgdaSymbol{:}\AgdaSpace{}%
 \AgdaFunction{CurrencySymbol}\<%
 \\
-%
+\>[0]\AgdaComment{--The\ currency\ symbol\ of\ the\ token\ being\ minted\ \ \ \ \ \ \ \ }\<%
+\\
+\>[0][@{}l@{\AgdaIndent{0}}]%
 \>[8]\AgdaField{validInterval}%
 \>[25]\AgdaSymbol{:}\AgdaSpace{}%
-\AgdaFunction{Interval}\<%
+\AgdaFunction{POSIXTimeRange}\<%
+\\
+\>[0]\AgdaComment{--The\ validity\ interval\ for\ this\ transaction}\<%
 \end{code}
 }
 
@@ -496,7 +516,7 @@
 \AgdaSymbol{:}\AgdaSpace{}%
 \AgdaRecord{ScriptContext}\AgdaSpace{}%
 \AgdaSymbol{->}\AgdaSpace{}%
-\AgdaFunction{Interval}\<%
+\AgdaFunction{POSIXTimeRange}\<%
 \\
 \>[0]\AgdaFunction{validRange}\AgdaSpace{}%
 \AgdaBound{ctx}\AgdaSpace{}%
@@ -532,7 +552,7 @@
 \AgdaDatatype{Redeemer}\<%
 \\
 %
-\>[2]\AgdaInductiveConstructor{Withdraw}%
+\>[2]\AgdaInductiveConstructor{Deposit}%
 \>[12]\AgdaSymbol{:}\AgdaSpace{}%
 \AgdaFunction{PubKeyHash}\AgdaSpace{}%
 \AgdaSymbol{->}\AgdaSpace{}%
@@ -541,7 +561,7 @@
 \AgdaDatatype{Redeemer}\<%
 \\
 %
-\>[2]\AgdaInductiveConstructor{Deposit}%
+\>[2]\AgdaInductiveConstructor{Withdraw}%
 \>[12]\AgdaSymbol{:}\AgdaSpace{}%
 \AgdaFunction{PubKeyHash}\AgdaSpace{}%
 \AgdaSymbol{->}\AgdaSpace{}%

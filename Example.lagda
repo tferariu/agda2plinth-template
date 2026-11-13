@@ -1,12 +1,17 @@
 \begin{code}[hide]
 
-open import Haskell.Prelude hiding (All)
+open import Haskell.Prelude hiding (All; a; b)
+open import Relation.Unary hiding (_⊢_)
 open import Agda.Primitive
 open import Lib
 open import Value
 open import Data.Product using (∃; ∃-syntax; proj₁; proj₂) renaming (_,_ to ⟨_,_⟩; _×_ to _xx_)
 
 module Example where
+
+private
+  variable
+    a b p q r ℓ : Level
 
 \end{code}
 
@@ -162,11 +167,9 @@ data _⊢_~[_]~*_ : MParams -> State -> List Redeemer -> State -> Set
 
 \newcommand\exAll{%
 \begin{code}
-
-data All {a b} {A : Type a} (B : A → Type b) : List A → Type (a ⊔ b) where
-  instance
-    allNil  : All B []
-    allCons : ∀ {x xs} ⦃ i : B x ⦄ ⦃ is : All B xs ⦄ → All B (x ∷ xs)
+data All {A : Set a} (P : Pred A p) : Pred (List A) (a ⊔ p) where
+  []  : All P []
+  _∷_ : ∀ {x xs} (px : P x) (pxs : All P xs) → All P (x ∷ xs)
 \end{code}
 }
 

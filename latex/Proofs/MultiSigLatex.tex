@@ -1,4 +1,4 @@
-\begin{code}%
+\begin{code}[hide]%
 \>[0]\AgdaKeyword{open}\AgdaSpace{}%
 \AgdaKeyword{import}\AgdaSpace{}%
 \AgdaModule{Haskell.Prelude}\<%
@@ -222,6 +222,8 @@
 \AgdaSymbol{:}\AgdaSpace{}%
 \AgdaFunction{PubKeyHash}\AgdaSpace{}%
 \AgdaSymbol{->}\AgdaSpace{}%
+\AgdaFunction{Value}\AgdaSpace{}%
+\AgdaSymbol{->}\AgdaSpace{}%
 \AgdaDatatype{List}\AgdaSpace{}%
 \AgdaSymbol{(}\AgdaFunction{PubKeyHash}\AgdaSpace{}%
 \AgdaOperator{\AgdaRecord{×}}\AgdaSpace{}%
@@ -231,15 +233,17 @@
 \\
 \>[0]\AgdaFunction{getPayment'}\AgdaSpace{}%
 \AgdaBound{pkh}\AgdaSpace{}%
+\AgdaBound{v}\AgdaSpace{}%
 \AgdaInductiveConstructor{[]}\AgdaSpace{}%
 \AgdaSymbol{=}\AgdaSpace{}%
 \AgdaFunction{emptyValue}\<%
 \\
 \>[0]\AgdaFunction{getPayment'}\AgdaSpace{}%
 \AgdaBound{pkh}\AgdaSpace{}%
+\AgdaBound{v}\AgdaSpace{}%
 \AgdaSymbol{((}\AgdaBound{pkh'}\AgdaSpace{}%
 \AgdaOperator{\AgdaInductiveConstructor{,}}\AgdaSpace{}%
-\AgdaBound{v}\AgdaSymbol{)}\AgdaSpace{}%
+\AgdaBound{v'}\AgdaSymbol{)}\AgdaSpace{}%
 \AgdaOperator{\AgdaInductiveConstructor{∷}}\AgdaSpace{}%
 \AgdaBound{xs}\AgdaSymbol{)}\AgdaSpace{}%
 \AgdaSymbol{=}\AgdaSpace{}%
@@ -247,11 +251,16 @@
 \AgdaBound{pkh}\AgdaSpace{}%
 \AgdaOperator{\AgdaField{==}}\AgdaSpace{}%
 \AgdaBound{pkh'}\AgdaSpace{}%
+\AgdaOperator{\AgdaFunction{\&\&}}\AgdaSpace{}%
+\AgdaBound{v}\AgdaSpace{}%
+\AgdaOperator{\AgdaField{==}}\AgdaSpace{}%
+\AgdaBound{v'}\AgdaSpace{}%
 \AgdaOperator{\AgdaFunction{then}}\AgdaSpace{}%
 \AgdaBound{v}\AgdaSpace{}%
 \AgdaOperator{\AgdaFunction{else}}\AgdaSpace{}%
 \AgdaFunction{getPayment'}\AgdaSpace{}%
 \AgdaBound{pkh}\AgdaSpace{}%
+\AgdaBound{v}\AgdaSpace{}%
 \AgdaBound{xs}\<%
 \\
 %
@@ -260,16 +269,20 @@
 \AgdaSymbol{:}\AgdaSpace{}%
 \AgdaFunction{PubKeyHash}\AgdaSpace{}%
 \AgdaSymbol{->}\AgdaSpace{}%
+\AgdaFunction{Value}\AgdaSpace{}%
+\AgdaSymbol{->}\AgdaSpace{}%
 \AgdaRecord{ScriptContext}\AgdaSpace{}%
 \AgdaSymbol{->}\AgdaSpace{}%
 \AgdaFunction{Value}\<%
 \\
 \>[0]\AgdaFunction{getPayment}\AgdaSpace{}%
 \AgdaBound{pkh}\AgdaSpace{}%
+\AgdaBound{v}\AgdaSpace{}%
 \AgdaBound{ctx}\AgdaSpace{}%
 \AgdaSymbol{=}\AgdaSpace{}%
 \AgdaFunction{getPayment'}\AgdaSpace{}%
 \AgdaBound{pkh}\AgdaSpace{}%
+\AgdaBound{v}\AgdaSpace{}%
 \AgdaSymbol{(}\AgdaField{ScriptContext.payments}\AgdaSpace{}%
 \AgdaBound{ctx}\AgdaSymbol{)}\<%
 \\
@@ -506,6 +519,7 @@
 \AgdaSymbol{=}\AgdaSpace{}%
 \AgdaFunction{getPayment}\AgdaSpace{}%
 \AgdaBound{pkh}\AgdaSpace{}%
+\AgdaBound{v}\AgdaSpace{}%
 \AgdaBound{ctx}\AgdaSpace{}%
 \AgdaOperator{\AgdaField{==}}\AgdaSpace{}%
 \AgdaBound{v}\<%
@@ -649,39 +663,6 @@
 \>[0]\<%
 \end{code}
 
-\newcommand\msQuery{%
-\begin{code}%
-\>[0]\AgdaFunction{query}\AgdaSpace{}%
-\AgdaSymbol{:}\AgdaSpace{}%
-\AgdaFunction{PubKeyHash}\AgdaSpace{}%
-\AgdaSymbol{->}\AgdaSpace{}%
-\AgdaDatatype{List}\AgdaSpace{}%
-\AgdaFunction{PubKeyHash}\AgdaSpace{}%
-\AgdaSymbol{->}\AgdaSpace{}%
-\AgdaDatatype{Bool}\<%
-\\
-\>[0]\AgdaFunction{query}\AgdaSpace{}%
-\AgdaBound{pkh}\AgdaSpace{}%
-\AgdaInductiveConstructor{[]}\AgdaSpace{}%
-\AgdaSymbol{=}\AgdaSpace{}%
-\AgdaInductiveConstructor{False}\<%
-\\
-\>[0]\AgdaFunction{query}\AgdaSpace{}%
-\AgdaBound{pkh}\AgdaSpace{}%
-\AgdaSymbol{(}\AgdaBound{x}\AgdaSpace{}%
-\AgdaOperator{\AgdaInductiveConstructor{∷}}\AgdaSpace{}%
-\AgdaBound{l'}\AgdaSymbol{)}\AgdaSpace{}%
-\AgdaSymbol{=}\AgdaSpace{}%
-\AgdaSymbol{(}\AgdaBound{x}\AgdaSpace{}%
-\AgdaOperator{\AgdaField{==}}\AgdaSpace{}%
-\AgdaBound{pkh}\AgdaSymbol{)}\AgdaSpace{}%
-\AgdaOperator{\AgdaFunction{||}}\AgdaSpace{}%
-\AgdaFunction{query}\AgdaSpace{}%
-\AgdaBound{pkh}\AgdaSpace{}%
-\AgdaBound{l'}\<%
-\end{code}
-}
-
 
 \newcommand\msInsert{%
 \begin{code}%
@@ -798,18 +779,6 @@
 \>[0]\AgdaSymbol{\{-\#}\AgdaSpace{}%
 \AgdaKeyword{COMPILE}\AgdaSpace{}%
 \AgdaKeyword{AGDA2HS}\AgdaSpace{}%
-\AgdaFunction{query}\AgdaSpace{}%
-\AgdaSymbol{\#-\}}\<%
-\\
-\>[0]\AgdaSymbol{\{-\#}\AgdaSpace{}%
-\AgdaKeyword{COMPILE}\AgdaSpace{}%
-\AgdaKeyword{AGDA2HS}\AgdaSpace{}%
-\AgdaFunction{insert}\AgdaSpace{}%
-\AgdaSymbol{\#-\}}\<%
-\\
-\>[0]\AgdaSymbol{\{-\#}\AgdaSpace{}%
-\AgdaKeyword{COMPILE}\AgdaSpace{}%
-\AgdaKeyword{AGDA2HS}\AgdaSpace{}%
 \AgdaFunction{expired}\AgdaSpace{}%
 \AgdaSymbol{\#-\}}\<%
 \\
@@ -824,7 +793,7 @@
 \>[0]\AgdaComment{--\ The\ Validator}\<%
 \end{code}
 
-\newcommand\msPropose{%
+\newcommand\msProposeI{%
 \begin{code}%
 \>[0]\AgdaFunction{agdaValidator}\AgdaSpace{}%
 \AgdaSymbol{:}\AgdaSpace{}%
@@ -839,7 +808,7 @@
 \AgdaDatatype{Bool}\<%
 \\
 \>[0]\AgdaFunction{agdaValidator}\AgdaSpace{}%
-\AgdaBound{param}\AgdaSpace{}%
+\AgdaBound{par}\AgdaSpace{}%
 \AgdaSymbol{(}\AgdaBound{tok}\AgdaSpace{}%
 \AgdaOperator{\AgdaInductiveConstructor{,}}\AgdaSpace{}%
 \AgdaBound{lab}\AgdaSymbol{)}\AgdaSpace{}%
@@ -890,7 +859,7 @@
 \AgdaFunction{minValue}\AgdaSpace{}%
 \AgdaOperator{\AgdaFunction{\&\&}}\AgdaSpace{}%
 \AgdaFunction{notTooLate}\AgdaSpace{}%
-\AgdaBound{param}\AgdaSpace{}%
+\AgdaBound{par}\AgdaSpace{}%
 \AgdaBound{d}\AgdaSpace{}%
 \AgdaBound{ctx}\AgdaSpace{}%
 \AgdaOperator{\AgdaFunction{\&\&}}\AgdaSpace{}%
@@ -951,7 +920,7 @@
 \end{code}
 }
 
-\newcommand\msAdd{%
+\newcommand\msAddI{%
 \begin{code}%
 %
 \>[4]\AgdaSymbol{((}\AgdaInductiveConstructor{Collecting}\AgdaSpace{}%
@@ -980,7 +949,7 @@
 \>[6]\AgdaField{elem}\AgdaSpace{}%
 \AgdaBound{sig}\AgdaSpace{}%
 \AgdaSymbol{(}\AgdaField{authSigs}\AgdaSpace{}%
-\AgdaBound{param}\AgdaSymbol{)}\AgdaSpace{}%
+\AgdaBound{par}\AgdaSymbol{)}\AgdaSpace{}%
 \AgdaOperator{\AgdaFunction{\&\&}}\AgdaSpace{}%
 \AgdaFunction{continuing}\AgdaSpace{}%
 \AgdaBound{ctx}\AgdaSpace{}%
@@ -1043,7 +1012,7 @@
 \end{code}
 }
 
-\newcommand\msCancel{%
+\newcommand\msCancelI{%
 \begin{code}%
 %
 \>[4]\AgdaSymbol{((}\AgdaInductiveConstructor{Collecting}\AgdaSpace{}%
@@ -1104,7 +1073,7 @@
 \end{code}
 }
 
-\newcommand\msPay{%
+\newcommand\msPayI{%
 \begin{code}%
 %
 \>[4]\AgdaSymbol{((}\AgdaInductiveConstructor{Collecting}\AgdaSpace{}%
@@ -1121,7 +1090,7 @@
 \AgdaBound{sigs}\AgdaSymbol{)}\AgdaSpace{}%
 \AgdaOperator{\AgdaField{>=}}\AgdaSpace{}%
 \AgdaSymbol{(}\AgdaField{minSigs}\AgdaSpace{}%
-\AgdaBound{param}\AgdaSymbol{)}\AgdaSpace{}%
+\AgdaBound{par}\AgdaSymbol{)}\AgdaSpace{}%
 \AgdaOperator{\AgdaFunction{\&\&}}\AgdaSpace{}%
 \AgdaFunction{continuing}\AgdaSpace{}%
 \AgdaBound{ctx}\AgdaSpace{}%
@@ -1176,7 +1145,7 @@
 \end{code}
 }
 
-\newcommand\msStop{%
+\newcommand\msStopI{%
 \begin{code}%
 %
 \>[4]\AgdaSymbol{(}\AgdaInductiveConstructor{Holding}\AgdaSpace{}%
@@ -1202,7 +1171,7 @@
 \end{code}
 }
 
-\newcommand\msOther{%
+\newcommand\msOtherI{%
 \begin{code}%
 %
 \>[4]\AgdaCatchallClause{\AgdaSymbol{\AgdaUnderscore{}}}\AgdaSpace{}%
@@ -1350,12 +1319,12 @@
 \AgdaSymbol{:}\AgdaSpace{}%
 \AgdaRecord{Params}\AgdaSpace{}%
 \AgdaSymbol{->}\AgdaSpace{}%
-\AgdaDeadcode{\AgdaDatatype{Bool}}\<%
+\AgdaDatatype{Bool}\<%
 \\
-\>[0]\AgdaDeadcode{\AgdaFunction{checkParams}}\AgdaSpace{}%
-\AgdaDeadcode{\AgdaBound{par}}%
-\>[17]\AgdaDeadcode{\AgdaSymbol{=}}\AgdaSpace{}%
-\AgdaDeadcode{\AgdaSymbol{(}}\AgdaDeadcode{\AgdaFunction{noD}}\AgdaFunction{ups}\AgdaSpace{}%
+\>[0]\AgdaFunction{checkParams}\AgdaSpace{}%
+\AgdaBound{par}%
+\>[17]\AgdaSymbol{=}\AgdaSpace{}%
+\AgdaSymbol{(}\AgdaFunction{noDups}\AgdaSpace{}%
 \AgdaSymbol{(}\AgdaBound{par}\AgdaSpace{}%
 \AgdaSymbol{.}\AgdaField{authSigs}\AgdaSymbol{))}\AgdaSpace{}%
 \AgdaOperator{\AgdaFunction{\&\&}}\<%
@@ -1410,12 +1379,12 @@
 \AgdaOperator{\AgdaField{==}}\AgdaSpace{}%
 \AgdaNumber{1}%
 \>[20]\AgdaOperator{\AgdaFunction{then}}%
-\>[837I]\AgdaFunction{continuingAddr}\AgdaSpace{}%
+\>[820I]\AgdaFunction{continuingAddr}\AgdaSpace{}%
 \AgdaBound{addr}\AgdaSpace{}%
 \AgdaBound{ctx}\AgdaSpace{}%
 \AgdaOperator{\AgdaFunction{\&\&}}\<%
 \\
-\>[.][@{}l@{}]\<[837I]%
+\>[.][@{}l@{}]\<[820I]%
 \>[25]\AgdaFunction{consumes}\AgdaSpace{}%
 \AgdaBound{oref}\AgdaSpace{}%
 \AgdaBound{ctx}\AgdaSpace{}%
@@ -1441,7 +1410,7 @@
 \\
 %
 \>[2]\AgdaOperator{\AgdaFunction{else}}%
-\>[853I]\AgdaOperator{\AgdaFunction{if}}\AgdaSpace{}%
+\>[836I]\AgdaOperator{\AgdaFunction{if}}\AgdaSpace{}%
 \AgdaFunction{amt}\AgdaSpace{}%
 \AgdaOperator{\AgdaField{==}}\AgdaSpace{}%
 \AgdaNumber{-1}\AgdaSpace{}%
@@ -1451,7 +1420,7 @@
 \AgdaBound{addr}\AgdaSpace{}%
 \AgdaBound{ctx}\AgdaSymbol{)}\<%
 \\
-\>[.][@{}l@{}]\<[853I]%
+\>[.][@{}l@{}]\<[836I]%
 \>[7]\AgdaOperator{\AgdaFunction{else}}\AgdaSpace{}%
 \AgdaInductiveConstructor{False}\<%
 \\

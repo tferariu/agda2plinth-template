@@ -47,7 +47,7 @@ record ScriptContext : Set where
         inputRef      : TxOutRef
         mint          : Integer
         tokCurrSymbol : CurrencySymbol
-        validInterval : Interval
+        validInterval : POSIXTimeRange
 
 -- Functions equivalent to Plinth ScriptContext functions or provided by our template
 --https://plutus.cardano.intersectmbo.org/haddock/latest/plutus-ledger-api/PlutusLedgerApi-V3-Data-Contexts.html#t:ScriptContext
@@ -112,7 +112,7 @@ checkPayment : PubKeyHash -> Value -> ScriptContext -> Bool
 checkPayment pkh v ctx = getPayment pkh v ctx == v
 
 
-validRange : ScriptContext -> Interval
+validRange : ScriptContext -> POSIXTimeRange
 validRange ctx = ScriptContext.validInterval ctx
 
 -- The type of the Plinth Redeemer, referred to as Input in Agda
