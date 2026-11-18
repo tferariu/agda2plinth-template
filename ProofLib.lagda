@@ -82,8 +82,8 @@ n=n (Nat.suc n) = n=n n
 
 \newcommand\libEquivACSelf{%
 \begin{code}
-t=t : ∀ (t : AssetClass) -> (t == t) ≡ true
-t=t (cs , tn) rewrite n=n cs | n=n tn = refl
+ac=ac : ∀ (ac : AssetClass) -> (ac == ac) ≡ true
+ac=ac (cs , tn) rewrite n=n cs | n=n tn = refl
 \end{code}
 }
 

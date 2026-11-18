@@ -368,10 +368,9 @@ insertList (x ∷ asigs) sigs = insertList asigs (insert x sigs)
 
 \newcommand\msFinalSig{%
 \begin{code}
-finalSig : PubKeyHash -> List PubKeyHash -> PubKeyHash
-finalSig base [] = base
-finalSig base (pkh ∷ []) = pkh
-finalSig base (pkh1 ∷ pkh2 ∷ ls) = finalSig base (pkh2 ∷ ls)
+finalSig : List PubKeyHash -> PubKeyHash -> PubKeyHash
+finalSig [] pkh = pkh
+finalSig (pkh' ∷ pkhs) pkh = finalSig pkhs pkh'
 \end{code}
 }
 
@@ -380,10 +379,7 @@ finalSig base (pkh1 ∷ pkh2 ∷ ls) = finalSig base (pkh2 ∷ ls)
 appendLem : ∀ (x : PubKeyHash) (a b : List PubKeyHash)
   -> a ++ x ∷ b ≡ (a ++ x ∷ []) ++ b
 
-∈lemma : ∀ (xs ys : List PubKeyHash) (z : PubKeyHash) -> z ∈ (xs ++ z ∷ ys)
-
-finalSigLem : ∀ (pkh x : PubKeyHash) (xs : List PubKeyHash)
-  -> finalSig pkh (x ∷ xs) ≡ finalSig x xs
+∈Lem : ∀ (xs ys : List PubKeyHash) (z : PubKeyHash) -> z ∈ (xs ++ z ∷ ys)
 \end{code}
 }
 
@@ -400,7 +396,7 @@ prop : ∀ {v pkh d sigs tok} (s s' : State) (par : MParams)
   -> value s ≡ value s'
   -> spends s ≡ spends s'
   -> threadTokCS s ≡ threadTokCS s'
-  -> tsig s' ≡ finalSig (tsig s) asigs''
+  -> tsig s' ≡ finalSig asigs'' (tsig s)
   -> par ⊢ s ~[ makeIs asigs'' ]~* s'
 \end{code}
 }
@@ -412,10 +408,9 @@ prop {v} {pkh} {d} {sigs} {tok} s1 s2 par .(asigs1 ++ []) asigs1 []
 prop {v} {pkh} {d} {sigs} {tok} s1 s2 par
   .(asigs1 ++ x ∷ asigs2) asigs1 (x ∷ asigs2)
   refl refl refl refl refl refl refl refl refl refl
-  = cons (TAdd (∈lemma asigs1 asigs2 x) refl refl refl refl)
+  = cons (TAdd (∈Lem asigs1 asigs2 x) refl refl refl refl)
     (prop s' s2 par (asigs1 ++ x ∷ asigs2) (asigs1 ++ [ x ]) asigs2 refl
-    (appendLem x asigs1 asigs2) refl refl refl refl refl refl refl
-    (finalSigLem (tsig s1) x asigs2))
+    (appendLem x asigs1 asigs2) refl refl refl refl refl refl refl refl)
     where
       s' = record
             { datum = tok , Collecting v pkh d (insert x sigs)
@@ -440,7 +435,7 @@ prop1 : ∀ { v pkh d sigs tok } (s s' : State) (par : MParams)
   -> value s ≡ value s'
   -> spends s ≡ spends s'
   -> threadTokCS s ≡ threadTokCS s'
-  -> tsig s' ≡ finalSig (tsig s) (authSigs par)
+  -> tsig s' ≡ finalSig (authSigs par) (tsig s)
   -> par ⊢ s ~[ (makeIs (authSigs par)) ]~* s'
 prop1 s s' par p1 p2 p3 p4 p5 p6 p7 p8  = prop s s' par
   (authSigs par) [] (authSigs par) refl refl p1 p2 p3 p4 p5 p6 p7 p8
@@ -456,13 +451,9 @@ appendLem x [] b = refl
 appendLem x (a ∷ as) b = cong (λ y → a ∷ y) (appendLem x as b) 
 
 
-∈lemma [] ys z = here refl
-∈lemma (x ∷ xs) ys z = there (∈lemma xs ys z)
+∈Lem [] ys z = here refl
+∈Lem (x ∷ xs) ys z = there (∈Lem xs ys z)
 
-
-finalSigLem pkh x [] = refl
-finalSigLem pkh x (y ∷ []) = refl
-finalSigLem pkh x (y ∷ z ∷ xs) = finalSigLem pkh x (z ∷ xs)
 
 --Generalized Prop1 (Can add signatures 1 by 1)
 --Actual Prop1 (Can add all signatures 1 by 1)
@@ -599,7 +590,7 @@ liqLem {v} {pkh} {d} {sigs} {tok}
           ; value = s1 .value
           ; outVal = s1 .outVal 
           ; interval = s1 .interval 
-          ; tsig = finalSig (tsig s1) (authSigs par)
+          ; tsig = finalSig (authSigs par) (tsig s1)
           ; spends = s1 .spends
           ; threadTokCS = s1 .threadTokCS }
 \end{code}
@@ -850,8 +841,8 @@ getS (tok , lab) ctx = record
               ; threadTokCS = 0 }
 
 -- Initial State when we mint the token and put the smart contract on the blockchain
-getMintS : TokenName -> ScriptContext -> State
-getMintS tn ctx = record
+getMintS : ScriptContext -> State
+getMintS ctx = record
                 { datum = newDatum ctx
                 ; value = newValue ctx
                 ; outVal = 0
@@ -970,7 +961,7 @@ validatorImpliesRunning par (tok , Collecting v pkh d sigs) Stop ctx n pf = ⊥-
 mintingImpliesInitial : ∀ (par : Params) (adr : Address) (oref : TxOutRef) (tn : TokenName) (ctx : ScriptContext)
                            -> getMintedAmount ctx ≡ 1
                            -> (pf : agdaPolicy par adr oref tn tt ctx ≡ true)
-                           -> (getPar par oref tn ⊢ getMintS tn ctx
+                           -> (getPar par oref tn ⊢ getMintS ctx
                               × continuing ctx ≡ true
                               × getMintedAmount ctx ≡ 1
                               × checkTokenOut (ownAssetClass tn ctx) ctx ≡ true)
@@ -1029,31 +1020,31 @@ runningImpliesValidator : ∀ {oref tn} (par : Params) (d : Datum)
   -> agdaValidator par d i ctx ≡ true
 runningImpliesValidator par (tok , Holding) i ctx
   (TPropose {v} {pkh} {d} p1 p2 refl refl refl p6 , refl , p8 , p9)
-  rewrite v=v (oldValue ctx) | v=v v | n=n pkh | i=i d | t=t tok
+  rewrite v=v (oldValue ctx) | v=v v | n=n pkh | i=i d | ac=ac tok
     | p1 | p2 | p6 | p8 | p9 = refl
 runningImpliesValidator par (tok , Collecting v pkh d sigs) i ctx
   (TAdd {sig} p1 refl refl refl refl , refl , p7 , p8)
-  rewrite v=v (oldValue ctx) | v=v v | n=n pkh | i=i d | t=t tok
+  rewrite v=v (oldValue ctx) | v=v v | n=n pkh | i=i d | ac=ac tok
     | l=l (insert sig sigs) | n=n sig | ∈toElem p1 | p7 | p8 = p8 
 runningImpliesValidator par (tok , Collecting v pkh d sigs) i ctx
   (TPay p1 refl refl refl p5 , refl , p7 , p8)
-  rewrite p5 | v=v v | v=v ((newValue ctx) + v) | t=t tok
+  rewrite p5 | v=v v | v=v ((newValue ctx) + v) | ac=ac tok
     | lengthToLengthNat (minSigs par) sigs p1 | p7 | p8 = refl
 runningImpliesValidator par (tok , Collecting v pkh d sigs) i ctx
   (TCancel p1 refl refl refl , refl , p6 , p7)
-  rewrite v=v (oldValue ctx) | t=t tok | p1 | p6 | p7 = refl
+  rewrite v=v (oldValue ctx) | ac=ac tok | p1 | p6 | p7 = refl
 
 -- Being in the initial model state implies we can mint a token
 initialImpliesMinting : ∀ (par : Params) (adr : Address) (oref : TxOutRef)
   (tn : TokenName) (top : ⊤) (ctx : ScriptContext)
-  -> (getPar par oref tn ⊢ getMintS tn ctx
+  -> (getPar par oref tn ⊢ getMintS ctx
      × continuing ctx ≡ true
      × getMintedAmount ctx ≡ 1
      × checkTokenOut (ownAssetClass tn ctx) ctx ≡ true)
   -> agdaPolicy par adr oref tn top ctx ≡ true
 initialImpliesMinting par adr oref tn top record { outputDatum = ((cs , tn) , Holding) }
   (TStart refl p2 refl p4 p5 p6 , refl , refl , p9)
-  rewrite n=n oref | t=t (cs , tn) | p2 | p4 | p5 | p6 | p9 = refl
+  rewrite n=n oref | ac=ac (cs , tn) | p2 | p4 | p5 | p6 | p9 = refl
 
 -- Getting to the terminal state implies that the validator returns true and a token can be burned
 stopImpliesBoth : ∀ (par : Params) (d : Datum) (adr : Address) (oref : TxOutRef)
@@ -1129,7 +1120,7 @@ totalF arg with classifier arg
 -- The State Transition System as a relation
 totalR : Argument -> Set
 totalR arg with classifier arg
-... | Initial = getPar (arg .par) (arg .oref) (arg .tn) ⊢ getMintS (arg .tn) (arg .ctx)
+... | Initial = getPar (arg .par) (arg .oref) (arg .tn) ⊢ getMintS (arg .ctx)
                 × continuing (arg .ctx) ≡ true
                 × getMintedAmount (arg .ctx) ≡ 1
                 × checkTokenOutAddr (arg .adr) (ownAssetClass (arg .tn) (arg .ctx)) (arg .ctx) ≡ true
@@ -1234,8 +1225,8 @@ deadlockFreedom record { datum = (tok , Holding) ; value = value} par p1 p2 with
   where
   s1 = record
         { datum = (0 , 0) , Collecting 0 0 0 []
-        ; value = unMap []
-        ; outVal = unMap []
+        ; value = mkMap []
+        ; outVal = mkMap []
         ; interval = (toPOSIXTime 0) , (toPOSIXTime 0)
         ; tsig = 0
         ; spends = 0
@@ -1246,7 +1237,7 @@ deadlockFreedom record { datum = (tok , Holding) ; value = value} par p1 p2 with
   s2 = record
         { datum = tok , Collecting (value - minValue) 1234 0 []
         ; value = value
-        ; outVal = unMap []
+        ; outVal = mkMap []
         ; interval = (toPOSIXTime (maxWait par)) , (toPOSIXTime (maxWait par + 100))
         ; tsig = 0
         ; spends = 0
@@ -1257,7 +1248,7 @@ deadlockFreedom s@record { datum = (tok , Collecting v pkh d sigs) } par p1 p2 =
   s2 = record
         { datum = tok , Holding
         ; value = s .value
-        ; outVal = unMap []
+        ; outVal = mkMap []
         ; interval = (toPOSIXTime (d + 1)) , (toPOSIXTime (d + 100))
         ; tsig = 0
         ; spends = 0

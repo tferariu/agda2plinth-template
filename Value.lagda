@@ -1,7 +1,7 @@
 \begin{code}[hide]
 
 open import Lib
-open import Haskell.Prelude hiding (lookup)
+open import Haskell.Prelude hiding (lookup) renaming (True to true; False to false)
 open import Relation.Binary.PropositionalEquality.Core
 
 module Value where
@@ -48,15 +48,15 @@ deleteValue ac ((ac' , amt') ∷ xs) =
 \begin{code}
 eqValueAux : List (AssetClass × Integer)
           -> List (AssetClass × Integer) -> Bool
-eqValueAux [] [] = True
-eqValueAux [] ((ac , amt) ∷ vs) = if amt == 0 then eqValueAux [] vs else False
-eqValueAux ((ac , amt) ∷ vs) [] = if amt == 0 then eqValueAux vs [] else False
+eqValueAux [] [] = true
+eqValueAux [] ((ac , amt) ∷ vs) = if amt == 0 then eqValueAux [] vs else false
+eqValueAux ((ac , amt) ∷ vs) [] = if amt == 0 then eqValueAux vs [] else false
 eqValueAux ((ac , amt) ∷ vs) v2@((ac' , amt') ∷ vs')
   = if amt == (lookupValue ac v2) then eqValueAux vs (deleteValue ac v2)
-                                  else False
+                                  else false
 
 eqValue : Value -> Value -> Bool
-eqValue (unMap x) (unMap y) = eqValueAux x y 
+eqValue (mkMap x) (mkMap y) = eqValueAux x y 
 \end{code}
 }
 
@@ -72,7 +72,7 @@ addValueAux ((ac , amt) ∷ vs) v2@((ac' , amt') ∷ vs')
   = (ac , amt + (lookupValue ac v2)) ∷ addValueAux vs (deleteValue ac v2)
 
 addValue : Value -> Value -> Value
-addValue (unMap v1) (unMap v2) = unMap (addValueAux v1 v2)
+addValue (mkMap v1) (mkMap v2) = mkMap (addValueAux v1 v2)
 \end{code}
 }
 
@@ -83,7 +83,7 @@ negValueAux [] = []
 negValueAux ((ac , amt) ∷ vs) = (ac , (negateInteger amt)) ∷ (negValueAux vs)
 
 negValue : Value -> Value
-negValue (unMap xs) = unMap (negValueAux xs)
+negValue (mkMap xs) = mkMap (negValueAux xs)
 
 subValue : Value -> Value -> Value
 subValue v1 v2 = addValue v1 (negValue v2)
@@ -96,15 +96,15 @@ subValue v1 v2 = addValue v1 (negValue v2)
 \begin{code}
 ltValueAux : List (AssetClass × Integer)
           -> List (AssetClass × Integer) -> Bool
-ltValueAux [] [] = False
-ltValueAux [] ((ac , amt) ∷ vs) = if amt == 0 then ltValueAux [] vs else True
-ltValueAux (v ∷ vs) [] = False 
+ltValueAux [] [] = false
+ltValueAux [] ((ac , amt) ∷ vs) = if amt == 0 then ltValueAux [] vs else true
+ltValueAux (v ∷ vs) [] = false 
 ltValueAux ((ac , amt) ∷ vs) v2@((ac' , amt') ∷ vs')
   = if amt < (lookupValue ac v2) then ltValueAux vs (deleteValue ac v2)
-                                 else False
+                                 else false
 
 lt : Value -> Value -> Bool
-lt (unMap x) (unMap y) = ltValueAux x y 
+lt (mkMap x) (mkMap y) = ltValueAux x y 
 \end{code}
 }
 
@@ -124,13 +124,13 @@ geq v1 v2 = leq v2 v1
 \newcommand\vBuiltin{%
 \begin{code}
 emptyValue : Value
-emptyValue = unMap []
+emptyValue = mkMap []
 
 minValue : Value
-minValue = unMap ((ada , 3) ∷ [])
+minValue = mkMap ((ada , 3) ∷ [])
 
 x2MinValue : Value
-x2MinValue = unMap ((ada , 6) ∷ [])
+x2MinValue = mkMap ((ada , 6) ∷ [])
 \end{code}
 }
 
@@ -148,7 +148,7 @@ instance
     { OrdFromLessThan iOrdFromLessThanValue }
 
   iNumberValue : Number Value
-  iNumberValue = record { Constraint = λ x → ⊤ ; fromNat = λ n → unMap ((ada , (Integer.pos n)) ∷ []) }
+  iNumberValue = record { Constraint = λ x → ⊤ ; fromNat = λ n → mkMap ((ada , (Integer.pos n)) ∷ []) }
 
   iNumValue : Num Value
   iNumValue .MinusOK _ _         = ⊤
@@ -160,16 +160,16 @@ instance
   iNumValue .negate x            = negValue x 
   iNumValue .abs x               = x 
   iNumValue .signum x            = x 
-  iNumValue .fromInteger n       = (unMap ((ada , n) ∷ [])) 
+  iNumValue .fromInteger n       = (mkMap ((ada , n) ∷ [])) 
 \end{code}
 }
 
 \newcommand\vLovelaces{%
 \begin{code}                                       
 lovelaces : Value -> Integer
-lovelaces (unMap []) = 0
-lovelaces (unMap ((ac , amt) ∷ vs)) = if ac == ada then amt
-                                         else lovelaces (unMap vs)
+lovelaces (mkMap []) = 0
+lovelaces (mkMap ((ac , amt) ∷ vs)) = if ac == ada then amt
+                                         else lovelaces (mkMap vs)
 \end{code}
 }
 
@@ -178,12 +178,12 @@ lovelaces (unMap ((ac , amt) ∷ vs)) = if ac == ada then amt
 \newcommand\vHelper{%
 \begin{code}                                       
 assetClassValueOf : Value -> AssetClass -> Integer
-assetClassValueOf (unMap []) ac = 0
-assetClassValueOf (unMap ((ac' , amt) ∷ vs)) ac =
-  if ac' == ac then amt else assetClassValueOf (unMap vs) ac
+assetClassValueOf (mkMap []) ac = 0
+assetClassValueOf (mkMap ((ac' , amt) ∷ vs)) ac =
+  if ac' == ac then amt else assetClassValueOf (mkMap vs) ac
 
 assetClassValue : AssetClass -> Integer -> Value
-assetClassValue ac amt = unMap ((ac , amt) ∷ [])
+assetClassValue ac amt = mkMap ((ac , amt) ∷ [])
 \end{code}
 }
 
@@ -194,9 +194,8 @@ assetClassValue ac amt = unMap ((ac , amt) ∷ [])
 postulate
   commVal : ∀ (a b : Value) -> a + b ≡ b + a
   assocVal : ∀ (a b c : Value) -> (a + b) + c ≡ a + (b + c)
-  v=v : ∀ (a : Value) -> (a == a) ≡ True
-  ==vto≡ : ∀ (a b : Value) -> (a == b) ≡ True -> a ≡ b
-  ≡vto== : ∀ (a b : Value) -> a ≡ b -> (a == b) ≡ True
+  ==vto≡ : ∀ (a b : Value) -> (a == b) ≡ true -> a ≡ b
+  ≡vto== : ∀ (a b : Value) -> a ≡ b -> (a == b) ≡ true
 \end{code}
 }
 
@@ -205,9 +204,9 @@ postulate
 \begin{code}
 postulate
   sumLemma : ∀ (a b : Value)
-           -> geq a emptyValue ≡ True
-           -> geq b emptyValue ≡ True
-           -> geq (a + b) emptyValue ≡ True
+           -> geq a emptyValue ≡ true
+           -> geq b emptyValue ≡ true
+           -> geq (a + b) emptyValue ≡ true
 \end{code}
 }
 
@@ -215,8 +214,8 @@ postulate
 \begin{code}
 postulate
   diffLemma : ∀ (a b : Value)
-            -> geq a b ≡ True
-            -> geq (a - b) emptyValue ≡ True
+            -> geq a b ≡ true
+            -> geq (a - b) emptyValue ≡ true
 \end{code}
 }
 
@@ -243,7 +242,7 @@ postulate
 \newcommand\vGEQRefl{%
 \begin{code}
 postulate
-  geqRefl : ∀ (a : Value) -> geq a a ≡ True
+  geqRefl : ∀ (a : Value) -> geq a a ≡ true
 \end{code}
 }
 
@@ -253,65 +252,75 @@ postulate
 
   doubleNeg : ∀ (a : Value) -> a ≡ negValue (negValue a)
   
-  notGeqToLt : ∀ (a b : Value) -> geq a b ≡ False -> lt a b ≡ True
-  ltToGt : ∀ (a b : Value) -> lt a b ≡ True -> gt b a ≡ True
-  geqTrans : ∀ (a b c : Value) -> geq a b ≡ True -> geq b c ≡ True -> geq a c ≡ True
+  notGeqToLt : ∀ (a b : Value) -> geq a b ≡ false -> lt a b ≡ true
+  ltToGt : ∀ (a b : Value) -> lt a b ≡ true -> gt b a ≡ true
+  geqTrans : ∀ (a b c : Value) -> geq a b ≡ true -> geq b c ≡ true -> geq a c ≡ true
 
   geqAddTrans : ∀ (a b c d : Value)
-              -> geq a (b + c) ≡ True
-              -> geq b d ≡ True
-              -> geq a (d + c) ≡ True
+              -> geq a (b + c) ≡ true
+              -> geq b d ≡ true
+              -> geq a (d + c) ≡ true
 
   geqSub : ∀ (a b c : Value)
-         -> geq a (b + c) ≡ True
-         -> geq (a - b) c ≡ True
+         -> geq a (b + c) ≡ true
+         -> geq (a - b) c ≡ true
          
   lovelaceLemma : ∀ (a : Value) 
-                        -> (lovelaces a >= lovelaces x2MinValue) ≡ True
-                        -> geq a x2MinValue ≡ True
+                        -> (lovelaces a >= lovelaces x2MinValue) ≡ true
+                        -> geq a x2MinValue ≡ true
 
 
 checkMinValue : Value -> Bool
 checkMinValue v = (assetClassValueOf v ada) >= 3
 
+\end{code}
 
+
+\newcommand\vEqV{%
+\begin{code}
+v=v : ∀ (a : Value) -> (a == a) ≡ true
+v=v a = ≡vto== a a refl
+\end{code}
+}
+
+\begin{code}[hide]
 
 
 {-
 sumLemma' : ∀ (a b : Value)
-           -> geq a emptyValue ≡ True
-           -> geq b emptyValue ≡ True
-           -> geq (addValue a b) emptyValue ≡ True
+           -> geq a emptyValue ≡ true
+           -> geq b emptyValue ≡ true
+           -> geq (addValue a b) emptyValue ≡ true
 sumLemma' (MkMap []) (MkMap []) = λ z z₁ → z
 sumLemma' (MkMap []) (MkMap (x ∷ y)) = λ z z₁ → z₁ --λ z z₁ → z
 sumLemma' (MkMap (x ∷ x₁)) (MkMap []) = λ z z₁ → z
 sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 with x .fst == y .fst in eq1
-sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | True = {!!} --p1
-sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False with x .fst .fst < y .fst .fst in eq2
-sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False | True = {!!} --p1
-sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False | False with x .fst .fst == y .fst .fst in eq3
-sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False | False | True with x .fst .snd < y .fst .snd in eq4
-sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False | False | True | True = {!!} --p1
-sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False | False | True | False with x .fst .snd == y .fst .snd in eq5
-sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False | False | True | False | True = {!!} --p1
-sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False | False | True | False | False = {!!} --p1
-sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | False | False | False  = {!!} --p1
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | true = {!!} --p1
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | false with x .fst .fst < y .fst .fst in eq2
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | false | true = {!!} --p1
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | false | false with x .fst .fst == y .fst .fst in eq3
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | false | false | true with x .fst .snd < y .fst .snd in eq4
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | false | false | true | true = {!!} --p1
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | false | false | true | false with x .fst .snd == y .fst .snd in eq5
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | false | false | true | false | true = {!!} --p1
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | false | false | true | false | false = {!!} --p1
+sumLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) p1 p2 | false | false | false  = {!!} --p1
 
 diffLemma' : ∀ (a b : Value)
-            -> geq a b ≡ True
-            -> geq (subValue a b) emptyValue ≡ True
+            -> geq a b ≡ true
+            -> geq (subValue a b) emptyValue ≡ true
 diffLemma' (MkMap []) (MkMap []) = λ z → z
 diffLemma' (MkMap []) (MkMap (x ∷ y)) = λ ()
 diffLemma' (MkMap (x ∷ x₁)) (MkMap []) = λ z → z
 diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) with x .fst .fst < y .fst .fst in eq1
-diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | True = λ ()
-diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False with x .fst .fst == y .fst .fst in eq2
-diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False | True with x .fst .snd < y .fst .snd in eq3
-diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False | True | True = λ ()
-diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False | True | False with x .fst .snd == y .fst .snd in eq4
-diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False | True | False | True = λ z → {!!} --refl
-diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False | True | False | False = λ z → {!!} --z
-diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False | False = λ z → {!!} --z
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | true = λ ()
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | false with x .fst .fst == y .fst .fst in eq2
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | false | true with x .fst .snd < y .fst .snd in eq3
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | false | true | true = λ ()
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | false | true | false with x .fst .snd == y .fst .snd in eq4
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | false | true | false | true = λ z → {!!} --refl
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | false | true | false | false = λ z → {!!} --z
+diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | false | false = λ z → {!!} --z
 -}
 
 {-
@@ -321,17 +330,17 @@ diffLemma' (MkMap (x ∷ xs)) (MkMap (y ∷ ys)) | False | False = λ z → {!!}
   iSemigroupValue ._<>_ = addValue
   
   subLemma : ∀ (a b : Value)
-           -> geq b emptyValue ≡ True
-           -> geq a (subValue a b) ≡ True
+           -> geq b emptyValue ≡ true
+           -> geq a (subValue a b) ≡ true
 
 
   geqSum : ∀ (a b c : Value)
-           -> geq a (addValue b c) ≡ True
-           -> geq c emptyValue ≡ True
-           -> geq a b ≡ True
+           -> geq a (addValue b c) ≡ true
+           -> geq c emptyValue ≡ true
+           -> geq a b ≡ true
   
          
- -- lovelaceLemma : ∀ (a b : Value) -> geq a b ≡ True -> (lovelaces a >= lovelaces b) ≡ True
+ -- lovelaceLemma : ∀ (a b : Value) -> geq a b ≡ true -> (lovelaces a >= lovelaces b) ≡ true
 
  -- lovelaceSumLemma : ∀ (a b : Value) -> lovelaces (addValue a b) ≡ lovelaces a + lovelaces b
   

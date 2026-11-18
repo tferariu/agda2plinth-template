@@ -235,8 +235,8 @@ getS (tok , lab) ctx = record
               ; threadTokCS = 0 }
 
 -- Initial State when we mint the token and put the smart contract on the blockchain
-getMintS : TokenName -> ScriptContext -> State
-getMintS tn ctx = record
+getMintS : ScriptContext -> State
+getMintS ctx = record
              { datum = newDatum ctx
              ; value = newValue ctx
              ; outVal = 0
@@ -326,7 +326,7 @@ mintingImpliesInitial : ∀ (par : Params) (adr : Address)
   (oref : TxOutRef) (tn : TokenName) (ctx : ScriptContext)
   -> getMintedAmount ctx ≡ 1
   -> (pf : agdaPolicy par adr oref tn tt ctx ≡ true)
-  -> (getPar par oref tn ⊢ getMintS tn ctx
+  -> (getPar par oref tn ⊢ getMintS ctx
       × continuing ctx ≡ true
       × getMintedAmount ctx ≡ 1
       × checkTokenOut (ownAssetClass tn ctx) ctx ≡ true)
@@ -366,24 +366,24 @@ runningImpliesValidator : ∀ {oref tn} (par : Params) (d : Datum)
   -> agdaValidator par d i ctx ≡ true
   
 runningImpliesValidator par d (Update v r) ctx ((TUpdate refl refl refl p4 p5) , refl , p7 , p8 )
-  rewrite p4 | p5 | n=n (owner (d .snd)) | v=v v | t=t (d .fst) | i=i (num r) | i=i (den r) | p7 | p8 = refl 
+  rewrite p4 | p5 | n=n (owner (d .snd)) | v=v v | ac=ac (d .fst) | i=i (num r) | i=i (den r) | p7 | p8 = refl 
 runningImpliesValidator record { sellCurr = sellC ; buyCurr = buyC } d (Exchange amt pkh) ctx ((TExchange refl refl p3 p4) , refl , p6 , p7 )
   rewrite p3 | p4 | p6 | p7
     | v=v (newValue ctx + assetClassValue sellC amt)
-    | t=t (d .fst) | i=i (num (ratio (d .snd))) | i=i (den (ratio (d .snd))) 
+    | ac=ac (d .fst) | i=i (num (ratio (d .snd))) | i=i (den (ratio (d .snd))) 
     | n=n (owner (snd d)) = refl
     
 -- Being in the initial model state implies we can mint a token
 initialImpliesMinting : ∀ (par : Params) (adr : Address)
   (oref : TxOutRef) (tn : TokenName) (top : ⊤) (ctx : ScriptContext)
-  -> (getPar par oref tn ⊢ getMintS tn ctx
+  -> (getPar par oref tn ⊢ getMintS ctx
      × continuing ctx ≡ true
      × getMintedAmount ctx ≡ 1
      × checkTokenOut (ownAssetClass tn ctx) ctx ≡ true)
   -> agdaPolicy par adr oref tn top ctx ≡ true
 
 initialImpliesMinting record { sellCurr = sellC ; buyCurr = buyC } adr oref tn top ctx ((TStart refl refl p3) , refl , refl , p6 )
-  rewrite t=t (ownAssetClass tn ctx) | n=n oref | p3 | p6 = refl
+  rewrite ac=ac (ownAssetClass tn ctx) | n=n oref | p3 | p6 = refl
   
 -- Getting to the terminal state implies that the validator returns true and a token can be burned
 finalImpliesBoth : ∀ {tn i} (par : Params) (d : Datum)
@@ -442,10 +442,10 @@ totalF arg with classifier arg
 -- The State Transition System as a relation
 totalR : Argument -> Set
 totalR arg with classifier arg
-... | Initial  = getPar (arg .par) (arg .oref) (arg .tn) ⊢ getMintS (arg .tn) (arg .ctx)
+... | Initial  = getPar (arg .par) (arg .oref) (arg .tn) ⊢ getMintS (arg .ctx)
                 × continuing (arg .ctx) ≡ true
                 × getMintedAmount (arg .ctx) ≡ 1
-                × checkTokenOutAddr (arg .adr) (ownAssetClass (arg .tn) (arg .ctx)) (arg .ctx) ≡ true
+                × checkTokenOut (ownAssetClass (arg .tn) (arg .ctx)) (arg .ctx) ≡ true
 ... | Running  = getPar (arg .par) (arg .oref) (arg .tn) ⊢ getS (arg .dat) (arg .ctx)  ~[ (arg .red) ]~> getS' (arg .dat) (arg .ctx)
   × continuing (arg .ctx) ≡ true
                 × checkTokenIn (arg .dat .fst) (arg .ctx) ≡ true
@@ -499,8 +499,8 @@ totalEquiv = record
 \begin{code}
 onlyOwnerCanStop : ∀ (par : MParams) (s s' : State)
   -> s' .tsig ≢ s .datum .snd .owner
-  -> ¬ (par ⊢ s ~[ Stop ]~> s')
-onlyOwnerCanStop par s s' p1 ()
+  -> ¬ (par ⊢ s ~[ Stop ]~| s')
+onlyOwnerCanStop par s s' p1 (TStop refl) = p1 refl
 \end{code}
 }
 
@@ -519,8 +519,8 @@ deadlockFreedom s par p = ⟨ s' , ⟨ Stop , (inj₂ (TStop refl)) ⟩ ⟩
   s' = record
         { datum = (0 , 0) ,
           record { ratio = record { num = 0 ; den = 0 } ; owner = 0 }
-        ; value = unMap []
-        ; outVal = unMap []
+        ; value = mkMap []
+        ; outVal = mkMap []
         ; tsig = s .datum .snd .owner
         ; spends = 0
         ; threadTokCS = 0

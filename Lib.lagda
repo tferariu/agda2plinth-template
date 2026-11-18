@@ -67,7 +67,7 @@ ada = (0 , 0)
 \newcommand\libMap{%
 \begin{code}
 data Map (k v : Set) : Set where
-  unMap : List (k × v) -> Map k v
+  mkMap : List (k × v) -> Map k v
 \end{code}
 }
 

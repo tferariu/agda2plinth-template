@@ -282,7 +282,7 @@ validP par = ⊤
 
 \newcommand\mLem{%
 \begin{code}
-lem : ∀ {pkh} (map : Label) (v : Value)
+insertLem : ∀ {pkh} (map : Label) (v : Value)
       -> geq v emptyValue ≡ true 
       -> All (λ y → geq (snd y) emptyValue ≡ true) map
       -> All (λ y → geq (snd y) emptyValue ≡ true) (insert pkh v map)
@@ -291,17 +291,17 @@ lem : ∀ {pkh} (map : Label) (v : Value)
 
 \newcommand\mLemP{%
 \begin{code}
-lem {pkh} [] v p1 p2 = p1 ∷ []
-lem {pkh} ((pkh' , v') ∷ map) v p1 (px ∷ pxs) with pkh == pkh'
+insertLem {pkh} [] v p1 p2 = p1 ∷ []
+insertLem {pkh} ((pkh' , v') ∷ map) v p1 (px ∷ pxs) with pkh == pkh'
 ...| true = p1 ∷ pxs
-...| false = px ∷ (lem map v p1 pxs)
+...| false = px ∷ (insertLem map v p1 pxs)
 \end{code}
 }
 
 
 \newcommand\mLemp{%
 \begin{code}
-lem' : ∀ {pkh} (map : Label) (v : Value)
+insertLem' : ∀ {pkh} (map : Label) (v : Value)
       -> geq v emptyValue ≡ true 
       -> All (λ y → geq (snd y) emptyValue ≡ true) map
       -> All (λ y → geq (snd y) emptyValue ≡ true) (insert pkh v map)
@@ -310,23 +310,23 @@ lem' : ∀ {pkh} (map : Label) (v : Value)
 
 \newcommand\mLemPpp{%
 \begin{code}
-lem' {pkh} [] v p1 p2 = p1 ∷ []
-lem' {pkh} ((pkh' , v') ∷ map) v p1 (px ∷ pxs) with pkh == pkh'
-lem' {pkh} ((pkh' , v') ∷ map) v p1 (px ∷ pxs) | true = p1 ∷ pxs
-lem' {pkh} ((pkh' , v') ∷ map) v p1 (px ∷ pxs) | false
-  = px ∷ (lem' map v p1 pxs)
+insertLem' {pkh} [] v p1 p2 = p1 ∷ []
+insertLem' {pkh} ((pkh' , v') ∷ map) v p1 (px ∷ pxs) with pkh == pkh'
+insertLem' {pkh} ((pkh' , v') ∷ map) v p1 (px ∷ pxs) | true = p1 ∷ pxs
+insertLem' {pkh} ((pkh' , v') ∷ map) v p1 (px ∷ pxs) | false
+  = px ∷ (insertLem' map v p1 pxs)
 \end{code}
 }
 
 \newcommand\mDelem{%
 \begin{code}
-delem : ∀ {pkh} (map : Label)
+deleteLem : ∀ {pkh} (map : Label)
       -> All (λ y → geq (snd y) emptyValue ≡ true) map
       -> All (λ y → geq (snd y) emptyValue ≡ true) (delete pkh map)
-delem {pkh} [] p = p
-delem {pkh} ((pkh' , v') ∷ map) (px ∷ pxs) with pkh == pkh'
+deleteLem {pkh} [] p = []
+deleteLem {pkh} ((pkh' , v') ∷ map) (px ∷ pxs) with pkh == pkh'
 ...| true = pxs
-...| false = px ∷ (delem map pxs)
+...| false = px ∷ (deleteLem map pxs)
 \end{code}
 }
 
@@ -387,7 +387,7 @@ validity : ∀ {s s' i par}
 \newcommand\mValOpen{%
 \begin{code}
 validity {s} p (TOpen refl p2 p3 refl p5)
-         = (lem (accMap s) emptyValue refl p)
+         = (insertLem (accMap s) emptyValue refl p)
 \end{code}
 }
 
@@ -395,14 +395,14 @@ validity {s} p (TOpen refl p2 p3 refl p5)
 \newcommand\mValClose{%
 \begin{code}
 validity {s} p (TClose refl p2 p3 refl p5)
-         = (delem (accMap s) p)
+         = (deleteLem (accMap s) p)
 \end{code}
 }
 
 \newcommand\mValDeposit{%
 \begin{code}
 validity {s} p (TDeposit {val = val} {v = v} refl p2 p3 p4 refl p6)
-         = let map = accMap s in lem map (v + val)
+         = let map = accMap s in insertLem map (v + val)
            (sumLemma v val (geqLem map v p p3) p4) p
 \end{code}
 
@@ -411,7 +411,7 @@ validity {s} p (TDeposit {val = val} {v = v} refl p2 p3 p4 refl p6)
 \newcommand\mValWithdraw{%
 \begin{code}
 validity {s} p (TWithdraw {val = val} {v = v} refl p2 p3 p4 p5 refl refl)
-         = lem (accMap s) (v - val) (diffLemma v val p5) p
+         = insertLem (accMap s) (v - val) (diffLemma v val p5) p
 \end{code}
 }
 
@@ -420,8 +420,8 @@ validity {s} p (TWithdraw {val = val} {v = v} refl p2 p3 p4 p5 refl refl)
 validity {s} p (TTransfer {par} {from} {to} {val} {vF = vF} {vT = vT}
          refl p2 p3 p4 p5 p6 p7 refl p9)
          = let map = accMap s in
-           lem (insert to (vT + val) map) (vF - val) (diffLemma vF val p6)
-           (lem map (vT + val) (sumLemma vT val (geqLem map vT p p4) p5) p)
+           insertLem (insert to (vT + val) map) (vF - val) (diffLemma vF val p6)
+           (insertLem map (vT + val) (sumLemma vT val (geqLem map vT p p4) p5) p)
 \end{code}
 } 
 
@@ -975,7 +975,7 @@ otherAccountsUnaffectedD :
   -> pkh1 ≢ pkh2
   -> lookup pkh2 (accMap s) ≡ lookup pkh2 (accMap s')
 otherAccountsUnaffectedD record {datum = (tok , map)} s' par pkh1 pkh2
-  (TDeposit refl refl c d refl refl) p2 = skipInsert pkh1 pkh2 map p2
+  (TDeposit refl refl p3 p4 refl refl) p7 = skipInsert pkh1 pkh2 map p7
 \end{code}
 }
 
@@ -988,7 +988,7 @@ otherAccountsUnaffectedW :
   -> pkh1 ≢ pkh2
   -> lookup pkh2 (accMap s) ≡ lookup pkh2 (accMap s')
 otherAccountsUnaffectedW record {datum = (tok , map)} s' par pkh1 pkh2
-  (TWithdraw refl refl c d e refl refl) p2 = skipInsert pkh1 pkh2 map p2
+  (TWithdraw refl refl p3 p4 p5 refl refl) p8 = skipInsert pkh1 pkh2 map p8
 \end{code}
 }
 
@@ -1027,11 +1027,10 @@ userCanRecoverFunds : ∀ {val par} (s : State) (pkh : PubKeyHash)
 
 \newcommand\mRecFp{%
 \begin{code}                           
-userCanRecoverFunds {val} (record { datum = (tok , map) ; value = v})
-  pkh p1 p2 = ⟨ s' , ((TWithdraw refl refl p1
-              (geqLem map val (p2 .fst) p1)
-              (geqRefl val) (rwDatum pkh val map) refl) ,
-              lookupInsertLem pkh emptyValue map) ⟩
+userCanRecoverFunds {val} s pkh p1 p2
+  = ⟨ s' , ((TWithdraw refl refl p1 (geqLem (accMap s) val (p2 .fst) p1)
+    (geqRefl val) (rwDatum pkh val (accMap s)) refl) ,
+    lookupInsertLem pkh emptyValue (accMap s)) ⟩
 \end{code}
 }
 
@@ -1039,8 +1038,8 @@ userCanRecoverFunds {val} (record { datum = (tok , map) ; value = v})
 \begin{code}                           
   where
   s' = record
-        { datum = tok , (insert pkh emptyValue map)
-        ; value = v - val
+        { datum = threadToken s , (insert pkh emptyValue (accMap s))
+        ; value = (value s) - val
         ; tsig = pkh
         ; spends = 0
         ; threadTokCS = 0 }
@@ -1192,8 +1191,8 @@ getS' ctx = record
 
 \newcommand\pGetMintS{%
 \begin{code}
-getMintS : TokenName -> ScriptContext -> State
-getMintS tn ctx = record
+getMintS : ScriptContext -> State
+getMintS ctx = record
                 { datum = newDatum ctx
                 ; value = newValue ctx
                 ; tsig = sig ctx
@@ -1272,7 +1271,7 @@ totalR arg with classifier arg
 
 \newcommand\pTotalRI{%
 \begin{code}
-... | Initial = getPar (arg .oref) (arg .tn) ⊢ getMintS (arg .tn) (arg .ctx)
+... | Initial = getPar (arg .oref) (arg .tn) ⊢ getMintS (arg .ctx)
                  × continuing (arg .ctx) ≡ true
                  × getMintedAmount (arg .ctx) ≡ 1
                  × checkTokenOutAddr (arg .adr)
@@ -1320,7 +1319,7 @@ mintingImpliesInitial : ∀ (adr : Address) (oref : TxOutRef) (tn : TokenName)
   (top : ⊤) (ctx : ScriptContext)
   -> getMintedAmount ctx ≡ 1
   -> agdaPolicy tt adr oref tn top ctx ≡ true
-  -> (getPar oref tn ⊢ getMintS tn ctx
+  -> (getPar oref tn ⊢ getMintS ctx
      × continuing ctx ≡ true
      × getMintedAmount ctx ≡ 1
      × checkTokenOut (ownAssetClass tn ctx) ctx ≡ true)
@@ -1433,7 +1432,7 @@ m=m ((tok , val) ∷ map) rewrite n=n tok | v=v val = m=m map
 \begin{code}
 initialImpliesMinting : ∀ (adr : Address) (oref : TxOutRef) (tn : TokenName)
   (top : ⊤) (ctx : ScriptContext)
-  -> (getPar oref tn ⊢ getMintS tn ctx
+  -> (getPar oref tn ⊢ getMintS ctx
      × continuing ctx ≡ true
      × getMintedAmount ctx ≡ 1
      × checkTokenOut (ownAssetClass tn ctx) ctx ≡ true)
@@ -1460,31 +1459,31 @@ runningImpliesValidator (tok , map) (Open pkh)
   record { inputVal = inputVal }
   ((TOpen refl refl p3 refl refl) , refl , p7 , p8)
   rewrite p3 | n=n pkh | m=m (insert pkh emptyValue map)
-          | v=v inputVal | t=t tok | p7 | p8 = refl
+          | v=v inputVal | ac=ac tok | p7 | p8 = refl
 runningImpliesValidator (tok , map) (Close pkh)
   record { inputVal = inputVal }
   ((TClose refl refl p3 refl refl) , refl , p7 , p8)
   rewrite p3 | n=n pkh | m=m (delete pkh map)
-          | v=v inputVal | t=t tok | p7 | p8 = refl
+          | v=v inputVal | ac=ac tok | p7 | p8 = refl
 runningImpliesValidator (tok , map) (Deposit pkh val)
   record { inputVal = inputVal }
   ((TDeposit {v = v} refl refl p3 p4 refl refl) , refl , p8 , p9)
   rewrite p3 | n=n pkh | v=v (inputVal + val)
           | m=m (insert pkh (v + val) map)
-          | p4 | t=t tok | p8 | p9 = refl
+          | p4 | ac=ac tok | p8 | p9 = refl
 runningImpliesValidator (tok , map) (Withdraw pkh val)
   record { inputVal = inputVal }
   ((TWithdraw {v = v} refl refl p3 p4 p5 refl refl) , refl , p9 , p10)
   rewrite p3 | n=n pkh | v=v (inputVal - val)
           | m=m (insert pkh (v - val) map)
-          | p4 | p5 | t=t tok | p9 | p10 = refl
+          | p4 | p5 | ac=ac tok | p9 | p10 = refl
 runningImpliesValidator (tok , map) (Transfer from to val)
   record { inputVal = inputVal }
   ((TTransfer {vF = vF} {vT = vT} refl refl p3 p4 p5 p6 p7 refl refl) ,
   refl , p11 , p12)
   rewrite p3 | p4 | ≢to/= from to p7 | n=n from | v=v inputVal
           | m=m (insert from (vF - val) (insert to (vT + val) map))
-          | p5 | p6 | t=t tok | p11 | p12 = refl
+          | p5 | p6 | ac=ac tok | p11 | p12 = refl
 \end{code}
 }
 
@@ -1530,7 +1529,7 @@ finalImpliesBoth d adr oref ctx ((TStop refl) , refl , refl , p4)
 
 -- Being in the initial model state implies we can mint a token
 initialImpliesMinting adr oref tn top record { inputVal = inputVal ; outputVal = outputVal ; outputDatum = (tok , l) ; signature = signature ; continues = continues ; inputRef = inputRef ; tokCurrSymbol = cs } ((TStart refl refl p4) , refl , refl , p7)
-  rewrite sym p4 | v=v outputVal | n=n oref | t=t tok | p7  = refl 
+  rewrite sym p4 | v=v outputVal | n=n oref | ac=ac tok | p7  = refl 
 
 -- Getting to the terminal state implies that the validator returns true and a token can be burned
 
